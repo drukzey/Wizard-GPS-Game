@@ -34,6 +34,8 @@ function worldQ(o, out) { o.matrixWorld.decompose(_p, out, _s); return out; }
 function worldP(o, out) { return out.setFromMatrixPosition(o.matrixWorld); }
 
 /** Prepare the animation library from the parsed rig and clip FBX objects. */
+/** Add more clips to an existing library (e.g. the combat set, fetched when the first battle starts). */
+export function addClips(lib, clipObjs) { Object.assign(lib.clips, makeLibrary(null, clipObjs).clips); }
 export function makeLibrary(rigObj, clipObjs) {
   const clips = {};
   for (const [name, obj] of Object.entries(clipObjs)) {
@@ -48,6 +50,7 @@ export function makeLibrary(rigObj, clipObjs) {
     }
     clips[name] = new THREE.AnimationClip(name, src.duration, tracks);
   }
+  if (!rigObj) return { clips };
   // Rename rig nodes to clean names so tracks bind.
   rigObj.traverse((o) => { o.name = clean(o.name); });
   rigObj.updateMatrixWorld(true);

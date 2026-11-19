@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=41';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=41';
-import * as Col from './collection.js?v=41';
-import * as P from './progression.js?v=41';
-import * as S from './sanctuary.js?v=41';
-import * as Stage from './stage.js?v=41';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=41';
-import * as World from './world.js?v=41';
+import { createSim } from './sim.js?v=42';
+import { Animator, makeLibrary, addClips, gunzipB64 } from './anim.js?v=42';
+import * as Col from './collection.js?v=42';
+import * as P from './progression.js?v=42';
+import * as S from './sanctuary.js?v=42';
+import * as Stage from './stage.js?v=42';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=42';
+import * as World from './world.js?v=42';
 
 const $ = (id) => document.getElementById(id);
-const VER = 41; // cache-busting version, kept in step by stamp.py
+const VER = 42; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -122,7 +122,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=41`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=42`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -131,9 +131,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=41')).default, ...(await import('./pub/anims_m5.js?v=41')).default, ...(await import('./pub/anims_custom.js?v=41')).default };
-    const objs = {};
-    for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
+    const objs = await parseClips(await fetchJSON('pub/anims_core.json'));
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
     const rig = SkeletonUtils.clone(objs.idle);
     assets.lib = makeLibrary(rig, objs);
@@ -147,7 +145,12 @@ async function loadAll() {
 // Models and atlases load on first use, one file each, so start-up only fetches the wizard and the map.
 const atlasP = {}, modelP = {};
 function ensureAtlas(k) { return (atlasP[k] ||= loadTexture(ATLAS[k]).then((t) => (assets.atlas[k] = t))); }
-const packed = (k) => import(`./pub/m/${k}.js?v=${VER}`).then((m) => m.default);
+// Packed data comes as plain JSON (not JS modules), so the base64 text is garbage-collected once unpacked.
+const fetchJSON = (path) => fetch(`${path}?v=${VER}`).then((r) => r.json());
+const packed = (k) => fetchJSON(`pub/m/${k}.json`);
+async function parseClips(packedClips) { const objs = {}; for (const [k, b64] of Object.entries(packedClips)) objs[k] = fbx.parse(await gunzipB64(b64), ''); return objs; }
+let combatP = null; // dodge, cast, hit and death clips: only needed once a battle starts
+const ensureCombatClips = () => (combatP ||= (async () => { if (!assets.lib) return; try { addClips(assets.lib, await parseClips(await fetchJSON('pub/anims_combat.json'))); } catch (err) { console.warn('[anim] combat clips', err); } })());
 /** Load, unpack and prepare one character model (and its portrait). Safe to call many times. */
 function ensureModel(k) {
   if (!MODELS[k]) return Promise.resolve(null);
@@ -186,7 +189,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=41')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=42')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       const df = name.startsWith('df_'); // Dark Fantasy pieces use their own atlas, and their fire and runes glow
@@ -1235,7 +1238,7 @@ function clearVisuals() {
 let arenaBuilt = false;
 async function startBattle(rift = null, portal = false) {
   const need = ['base_dungeon', ...famModels(loadout), ...Object.values(cfg.enemies).map((e) => e.model)]; // bosses summon others, so bring every enemy
-  if (need.some((k) => !assets.models[k])) { toast('Opening the way…'); await ensureModels(need); }
+  if (need.some((k) => !assets.models[k]) || !combatP) { toast('Opening the way…'); await Promise.all([ensureModels(need), ensureCombatClips()]); }
   if (!arenaBuilt) { buildArena(cfg); arenaBuilt = true; }
   store.set('ww.loadout', loadout);
   const prev = settleRun(); // starting again mid-run still pays out the run so far
@@ -1534,7 +1537,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=41')).json();
+    cfg = await (await fetch('data/config.json?v=42')).json();
     await loadAll();
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
     if (!Object.keys(col.owned).length) Col.grantStarters(cfg, col, Date.now());
