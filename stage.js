@@ -47,11 +47,11 @@ export function buildHub() {
   hub.motes = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffb070, size: 0.05, transparent: true, opacity: 0.7, depthWrite: false }));
   s.add(hub.motes);
   hub.wizard = D.instance('mage');
-  if (hub.wizard) { plat.add(hub.wizard); hub.hand = findBone(hub.wizard, /hand_r$/i); hub.wizard.userData.anim?.setLoco({ idle: 0.35, stance: 0.65 }); }
+  if (hub.wizard) { hub.wizard.position.set(-0.3, 0, 0.6); plat.add(hub.wizard); hub.hand = findBone(hub.wizard, /hand_r$/i); hub.wizard.userData.anim?.setLoco({ idle: 0.35, stance: 0.65 }); }
 }
 const findBone = (root, re) => { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; };
 
-export const STAFF_LEN = 1.7, STAFF_ROT = new THREE.Euler(0, 0, Math.PI / 2), STAFF_POS = new THREE.Vector3(0, 0, 0);
+export const STAFF_LEN = 1.7, STAFF_ROT = new THREE.Euler(0, 0, -Math.PI / 2), STAFF_GRIP = 0.55;
 /** Put a weapon model in the wizard's right hand (shared with the battle visual). */
 export async function attachStaff(wizard, modelName) {
   const hand = findBone(wizard, /hand_r$/i); if (!hand) return null;
@@ -64,7 +64,7 @@ export async function attachStaff(wizard, modelName) {
   const box = new THREE.Box3().setFromObject(obj), len = Math.max(1e-3, box.max.y - box.min.y);
   const k = STAFF_LEN / len / ws.x; obj.scale.setScalar(k);
   obj.rotation.set(STAFF_ROT.x, STAFF_ROT.y, STAFF_ROT.z);
-  obj.position.copy(STAFF_POS).multiplyScalar(1 / ws.x); // grip a third of the way up
+  obj.position.set(0, 0, 0); obj.translateY(-STAFF_GRIP * k); // the hand closes a third of the way up the shaft
   hand.add(obj); return obj;
 }
 
@@ -73,7 +73,7 @@ export async function setHubLoadout(teamIds, weaponModel) {
   if (teamIds.join() === hub.teamIds.join()) return;
   hub.teamIds = [...teamIds];
   for (const g of hub.team) hub.platform.remove(g);
-  const spots = [[-2.1, -1.2, 0.45], [2.1, -1.2, -0.45], [0, -2.6, 0]];
+  const spots = [[-2.4, -1.0, 0.45], [2.4, -1.0, -0.45], [1.2, -2.6, -0.2]];
   hub.team = teamIds.map((fid, i) => {
     const f = D.cfg().familiars[fid], g = D.instance(f.model); if (!g) return null;
     prepCreature(g, f.model, 0.85); g.position.set(spots[i][0], 0, spots[i][1]); g.rotation.y = spots[i][2];
@@ -87,7 +87,10 @@ export function renderHub(renderer, dt, t, layout) {
   const w = innerWidth, h = innerHeight, c = hub.cam;
   c.aspect = w / h;
   const portrait = w < h;
-  c.position.set(0, portrait ? 2.6 : 2.2, portrait ? 10.5 : 8.2); c.lookAt(0, 1.15, -0.6);
+  // pull back so the whole platform fits in the part of the screen the sheet leaves free
+  const free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
+  const k = Math.min(2.4, 1 / Math.max(0.35, free));
+  c.position.set(0, (portrait ? 2.6 : 2.2) * (0.6 + 0.4 * k), (portrait ? 10.5 : 8.2) * k); c.lookAt(0, 1.15, -0.6);
   c.clearViewOffset();
   if (layout.sheet) {
     if (portrait) c.setViewOffset(w, h, 0, h * layout.sheet * 0.5, w, h); // shift the scene up by half the sheet height
@@ -105,7 +108,7 @@ export function renderHub(renderer, dt, t, layout) {
 export function spinHub(dx) { hub.yawV = dx * 3; hub.yaw += dx; }
 
 // ---------- Sanctuary plot ----------
-export const home = { scene: null, cam: null, root: null, facilities: {}, decor: [], ghost: null, yaw: Math.PI / 4, pitch: 0.82, dist: 34, tiles: null, target: new THREE.Vector3(), built: '' };
+export const home = { scene: null, cam: null, root: null, facilities: {}, decor: [], ghost: null, yaw: Math.PI / 4, pitch: 0.95, dist: 42, tiles: null, target: new THREE.Vector3(), built: '' };
 
 export function buildHome(cfg) {
   const s = home.scene = new THREE.Scene();
@@ -196,8 +199,9 @@ export function pickHome(cfg, sx, sy) {
 export function renderHome(renderer, dt, layout) {
   const w = innerWidth, h = innerHeight, c = home.cam;
   c.aspect = w / h;
-  const cp = Math.cos(home.pitch);
-  c.position.set(home.target.x + Math.sin(home.yaw) * cp * home.dist, Math.sin(home.pitch) * home.dist, home.target.z + Math.cos(home.yaw) * cp * home.dist);
+  const portrait = w < h, free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
+  const dist = home.dist * Math.min(2, 1 / Math.max(0.4, free)) * (portrait ? 1.25 : 1), cp = Math.cos(home.pitch);
+  c.position.set(home.target.x + Math.sin(home.yaw) * cp * dist, Math.sin(home.pitch) * dist, home.target.z + Math.cos(home.yaw) * cp * dist);
   c.lookAt(home.target);
   c.clearViewOffset();
   if (layout.sheet && w < h) c.setViewOffset(w, h, 0, h * layout.sheet * 0.5, w, h);
@@ -207,7 +211,7 @@ export function renderHome(renderer, dt, layout) {
 }
 export function orbitHome(dx, dy, dz) {
   home.yaw -= dx * 0.008; home.pitch = Math.max(0.35, Math.min(1.35, home.pitch + dy * 0.005));
-  home.dist = Math.max(14, Math.min(60, home.dist * (1 + dz)));
+  home.dist = Math.max(16, Math.min(70, home.dist * (1 + dz)));
 }
 /** Screen position of a facility's roof, for its floating label. */
 export function labelPos(id) {

@@ -1,16 +1,16 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=9';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=9';
-import * as Col from './collection.js?v=9';
-import * as P from './progression.js?v=9';
-import * as S from './sanctuary.js?v=9';
-import * as Stage from './stage.js?v=9';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=9';
+import { createSim } from './sim.js?v=10';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=10';
+import * as Col from './collection.js?v=10';
+import * as P from './progression.js?v=10';
+import * as S from './sanctuary.js?v=10';
+import * as Stage from './stage.js?v=10';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=10';
 
 const $ = (id) => document.getElementById(id);
-const VER = 9; // cache-busting version, kept in step by stamp.py
+const VER = 10; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -118,7 +118,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=9`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=10`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`);
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -127,7 +127,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=9')).default, ...(await import('./pub/anims_m5.js?v=9')).default };
+    const packed = { ...(await import('./pub/anims.js?v=10')).default, ...(await import('./pub/anims_m5.js?v=10')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -136,7 +136,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=9')).default, ...(await import('./pub/models_m4.js?v=9')).default };
+  const models = { ...(await import('./pub/models.js?v=10')).default, ...(await import('./pub/models_m4.js?v=10')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -158,7 +158,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=9')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=10')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
@@ -673,7 +673,7 @@ function showTab(tab) {
   if (tab === 'explore') document.querySelector('.tab[data-tab=explore]').classList.remove('alert');
   $('sheet').classList.toggle('low', tab === 'home' || tab === 'wizard');
   $('homeLabels').hidden = tab !== 'home';
-  if (tab !== 'home') { placing = null; Stage.setGhost(cfg, null); }
+  if (tab !== 'home') { placing = null; selDecor = null; Stage.setGhost(cfg, null); }
   ({ play: renderPlay, explore: renderExplore, wizard: renderWizard, home: renderHome, journal: renderJournal })[tab]();
   $('sheet').scrollTop = 0;
 }
@@ -824,7 +824,7 @@ function effectText(id, level) {
   if (e.branches) return `Research: ${e.branches.map((b) => cfg.research.branchNames[b].toLowerCase()).join(', ')}.`;
   return '';
 }
-function openFacility(id) { homeView = id; showTab('home'); Stage.focusHome?.(id); }
+function openFacility(id) { homeView = id; if (id !== 'dwelling') { placing = null; selDecor = null; Stage.setGhost(cfg, null); } showTab('home'); }
 function facChamber(el) {
   el.innerHTML = '<h2>Familiars <span class="comp">Ascension and modifiers</span></h2><div class="rows" id="chRows"></div>';
   for (const fid of Object.keys(col.owned)) {
@@ -912,6 +912,7 @@ function updateHomeLabels() {
     let el = box.querySelector(`[data-f=${id}]`);
     if (!el) { el = document.createElement('button'); el.className = 'hLabel'; el.dataset.f = id; el.onclick = () => openFacility(id); box.appendChild(el); }
     el.innerHTML = `${sprite(`n_${id}`)}${cfg.sanctuary.facilities[id].name} <small>${home.facilities[id]}</small>`;
+    el.style.pointerEvents = placing !== null ? 'none' : '';
     const p = Stage.labelPos(id); el.style.display = p ? '' : 'none'; if (p) { el.style.left = `${p.x}px`; el.style.top = `${p.y}px`; }
   }
 }
@@ -1324,7 +1325,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=9')).json();
+    cfg = await (await fetch('data/config.json?v=10')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));

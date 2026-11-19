@@ -57,7 +57,7 @@
   },
   "weapons": {
     "wpn_apprentice_staff": {
-      "name": "Apprentice Staff",
+      "name": "Oak Staff",
       "fireMode": "hold",
       "damage": 45,
       "speed": 18,
@@ -1041,7 +1041,7 @@
       "wpn_apprentice_staff": {
         "slot": "weapon",
         "weaponId": "wpn_apprentice_staff",
-        "name": "Apprentice Staff",
+        "name": "Oak Staff",
         "stats": {
           "damage": 0
         }
