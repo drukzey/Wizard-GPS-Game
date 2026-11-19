@@ -22,6 +22,13 @@ def ik(arm, bone, name, pole):
     c = arm.pose.bones[bone].constraints.new('IK'); c.target = t; c.pole_target = p; c.chain_count = 2; c.pole_angle = -math.pi / 2
     return t, c
 
+AIM_UP = os.environ.get('AIM_UP', 'UP_Z')
+def aim(arm, bone, name):
+    """Point the hand's bone (wrist to knuckles) at a keyed target so the fist faces forward around the staff."""
+    t = bpy.data.objects.new(name, None); bpy.context.collection.objects.link(t)
+    c = arm.pose.bones[bone].constraints.new('TRACK_TO'); c.target = t; c.track_axis = 'TRACK_Y'; c.up_axis = AIM_UP
+    return t, c
+
 def key_targets(arm, f0, f1, tracks):
     """tracks: {empty: fn(frame, hips)->Vector world target or None to leave IK off}"""
     for f in range(f0, f1 + 1):
@@ -66,26 +73,27 @@ def keys(frames, f):
 
 # 1. staffIdle: the standing idle with the right hand gripping the staff at the hip
 arm, act = load(f'{A3}/Idle/A_Idle_Standing_Masc.fbx'); f0, f1 = map(int, act.frame_range)
-r = ik(arm, 'Hand_R', 'tR', POLE_R)
-key_targets(arm, f0, f1, {r: lambda f, h: h + HOLD_R})
+r = ik(arm, 'Hand_R', 'tR', POLE_R); a = aim(arm, 'Hand_R', 'aR')
+key_targets(arm, f0, f1, {r: lambda f, h: h + HOLD_R, a: lambda f, h: h + HOLD_R + Vector((0.02, -0.4, -0.02))})
 bake_export(arm, 'staffIdle', f0, f1)
 
 # 2. staffWalk: the walk with the staff hand held steady (a little bob with the hips)
 arm, act = load(f'{A3}/Locomotion/Walk/A_Walk_F_Masc.fbx'); f0, f1 = map(int, act.frame_range)
-r = ik(arm, 'Hand_R', 'tR', POLE_R)
-key_targets(arm, f0, f1, {r: lambda f, h: h + HOLD_R + Vector((0, -0.03 * math.sin((f - f0) / (f1 - f0) * 4 * math.pi), 0))})
+r = ik(arm, 'Hand_R', 'tR', POLE_R); a = aim(arm, 'Hand_R', 'aR')
+bob = lambda f: Vector((0, -0.03 * math.sin((f - f0) / (f1 - f0) * 4 * math.pi), 0))
+key_targets(arm, f0, f1, {r: lambda f, h: h + HOLD_R + bob(f), a: lambda f, h: h + HOLD_R + bob(f) + Vector((0.02, -0.4, -0.02))})
 bake_export(arm, 'staffWalk', f0, f1)
 
 # 3. staffCast: raise the staff, then thrust it forward while the free hand pushes out (0.7 s)
 arm, act = load(f'{A3}/Idle/A_Idle_Standing_Masc.fbx'); f0 = int(act.frame_range[0]); f1 = f0 + 21
 R = [(f0, HOLD_R), (f0 + 6, Vector((-0.24, -0.05, 0.62))), (f0 + 11, Vector((-0.18, -0.55, 0.48))), (f0 + 15, Vector((-0.18, -0.52, 0.45))), (f1, HOLD_R)]
 L = [(f0, None), (f0 + 5, Vector((0.25, -0.15, 0.35))), (f0 + 11, Vector((0.12, -0.55, 0.50))), (f0 + 16, Vector((0.14, -0.50, 0.46))), (f1, None)]
-r = ik(arm, 'Hand_R', 'tR', POLE_R); l = ik(arm, 'Hand_L', 'tL', POLE_L)
+r = ik(arm, 'Hand_R', 'tR', POLE_R); l = ik(arm, 'Hand_L', 'tL', POLE_L); a = aim(arm, 'Hand_R', 'aR')
 def lkey(f, h):
     if f <= L[0][0] or f >= L[-1][0]: return None
     pts = [(L[0][0], L[1][1] * 0 + Vector((0.32, 0.0, -0.05))), *L[1:-1], (L[-1][0], Vector((0.32, 0.0, -0.05)))]
     return h + keys(pts, f)
-key_targets(arm, f0, f1, {r: lambda f, h: h + keys(R, f), l: lkey})
+key_targets(arm, f0, f1, {r: lambda f, h: h + keys(R, f), l: lkey, a: lambda f, h: h + keys(R, f) + Vector((0.02, -0.4, -0.02))})
 bake_export(arm, 'staffCast', f0, f1)
 
 # 4. channel: both hands raised and reaching, a slow pulse (loop, 2 s) - used when calling a familiar or drawing on a shrine
