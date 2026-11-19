@@ -6,13 +6,14 @@ export const PROFILE_VERSION = 1;
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function newProfile(cfg) {
-  return { version: PROFILE_VERSION, xp: 0, gold: 0, essence: 0, processed: [], familiars: {},
+  return { version: PROFILE_VERSION, xp: 0, gold: 0, essence: 0, materials: Object.fromEntries(Object.keys(cfg.materials || {}).map((k) => [k, 0])), processed: [], familiars: {},
     presets: Array(cfg.progression.presets).fill(null), stats: { battles: 0, bestWave: 0, kills: 0 } };
 }
 export function loadProfile(cfg, raw) {
   const p = newProfile(cfg);
   if (!raw || raw.version !== PROFILE_VERSION) return p;
   p.xp = Math.max(0, +raw.xp || 0); p.gold = Math.max(0, +raw.gold || 0); p.essence = Math.max(0, +raw.essence || 0);
+  for (const k of Object.keys(p.materials)) p.materials[k] = Math.max(0, +(raw.materials || {})[k] || 0);
   p.processed = (raw.processed || []).slice(-500);
   for (const [fid, f] of Object.entries(raw.familiars || {})) if (cfg.familiars[fid]) {
     const mod = f.modifierId && cfg.modifiers[f.modifierId]?.abilityId === cfg.familiars[fid].abilityId ? f.modifierId : null;
@@ -22,6 +23,7 @@ export function loadProfile(cfg, raw) {
   Object.assign(p.stats, raw.stats || {});
   return p;
 }
+export function addMats(into, add) { for (const [k, v] of Object.entries(add || {})) if (v) into[k] = (into[k] || 0) + v; return into; }
 const fam = (p, fid) => (p.familiars[fid] ||= { masteryXp: 0, modifierId: null });
 
 // ---- wizard level ----
@@ -44,14 +46,15 @@ export function masteryInfo(cfg, xp) {
 /** Battle rewards. No reward for a run with no kills (AFK); Mastery only for familiars that actually contributed. */
 export function battleRewards(cfg, result) {
   const B = cfg.progression.battle, M = cfg.progression.mastery;
-  const out = { xp: 0, gold: 0, essence: 0, mastery: {} };
+  const out = { xp: 0, gold: 0, essence: 0, mastery: {}, materials: {} };
   if (result.kills < B.minKillsForReward) return out;
   const waves = Math.min(result.wavesCleared, B.maxWavesRewarded);
   out.xp = B.xpPerKill * result.kills + B.xpPerWave * waves;
   out.gold = B.goldPerKill * result.kills + B.goldPerWave * waves;
   out.essence = B.essencePerWave * waves;
+  addMats(out.materials, { ore: (B.orePerWave || 0) * waves, arcaneStone: (B.stonePerWave || 0) * waves });
   const c = result.clearReward; // rift completed (M4): only passed when the sim reports a win
-  if (c) { out.xp += c.xp || 0; out.gold += c.gold || 0; out.essence += c.essence || 0; }
+  if (c) { out.xp += c.xp || 0; out.gold += c.gold || 0; out.essence += c.essence || 0; addMats(out.materials, c.materials); }
   for (const s of result.slots) {
     const contrib = s.damage * M.xpPerDamage + s.absorbed * M.xpPerAbsorb + s.hits * M.xpPerHit;
     if (contrib <= 0) continue; // casting into empty space earns nothing (GDD §6)
@@ -61,8 +64,9 @@ export function battleRewards(cfg, result) {
 }
 export function bindingRewards(cfg, res) {
   const R = cfg.progression.binding;
-  if (res.outcome !== 'bound') return { xp: 0, gold: 0, essence: 0, mastery: {} };
-  return res.first ? { xp: R.firstXp, gold: R.firstGold, essence: 0, mastery: {} } : { xp: R.dupeXp, gold: R.dupeGold, essence: R.dupeEssence, mastery: {} };
+  if (res.outcome !== 'bound') return { xp: 0, gold: 0, essence: 0, mastery: {}, materials: {} };
+  return res.first ? { xp: R.firstXp, gold: R.firstGold, essence: 0, mastery: {}, materials: { runeFragments: R.firstRunes || 0 } }
+    : { xp: R.dupeXp, gold: R.dupeGold, essence: R.dupeEssence, mastery: {}, materials: { runeFragments: R.dupeRunes || 0 } };
 }
 
 /** Apply a reward exactly once per transaction id (GDD §17 idempotency). Returns level-ups for the results screen. */
@@ -71,6 +75,7 @@ export function grant(cfg, p, txId, d) {
   p.processed.push(txId); if (p.processed.length > 500) p.processed.shift();
   const before = levelInfo(cfg, p.xp).level;
   p.xp += d.xp || 0; p.gold += d.gold || 0; p.essence += d.essence || 0;
+  addMats(p.materials, d.materials);
   const mastery = {};
   for (const [fid, x] of Object.entries(d.mastery || {})) {
     const f = fam(p, fid), from = masteryInfo(cfg, f.masteryXp).level;

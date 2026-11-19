@@ -1,5 +1,5 @@
 {
-  "version": "m4-0.1",
+  "version": "m5-0.1",
   "player": {
     "health": 1000,
     "mana": 100,
@@ -63,7 +63,33 @@
       "speed": 18,
       "range": 12,
       "radius": 0.22,
-      "fireInterval": 0.3
+      "fireInterval": 0.3,
+      "model": "staff_01",
+      "desc": "Steady bolts while you hold fire."
+    },
+    "wpn_scatter_staff": {
+      "name": "Scatter Staff",
+      "model": "staff_05",
+      "desc": "Three short bolts in a fixed fan. Strong up close, weak at range.",
+      "fireMode": "hold",
+      "damage": 24,
+      "speed": 16,
+      "range": 7,
+      "radius": 0.2,
+      "fireInterval": 0.42,
+      "count": 3,
+      "spreadDeg": 14
+    },
+    "wpn_seer_staff": {
+      "name": "Seer's Staff",
+      "model": "staff_08",
+      "desc": "Slow, heavy bolts that fly far.",
+      "fireMode": "hold",
+      "damage": 95,
+      "speed": 26,
+      "range": 17,
+      "radius": 0.26,
+      "fireInterval": 0.75
     }
   },
   "abilities": {
@@ -602,14 +628,18 @@
       "goldPerWave": 20,
       "essencePerWave": 3,
       "maxWavesRewarded": 12,
-      "minKillsForReward": 1
+      "minKillsForReward": 1,
+      "orePerWave": 2,
+      "stonePerWave": 1
     },
     "binding": {
       "firstXp": 60,
       "dupeXp": 15,
       "firstGold": 25,
       "dupeGold": 10,
-      "dupeEssence": 2
+      "dupeEssence": 2,
+      "dupeRunes": 1,
+      "firstRunes": 2
     },
     "mastery": {
       "cumulativeXp": [
@@ -849,7 +879,12 @@
       "clearReward": {
         "xp": 40,
         "gold": 20,
-        "essence": 2
+        "essence": 2,
+        "materials": {
+          "ore": 2,
+          "arcaneStone": 1,
+          "runeFragments": 1
+        }
       }
     },
     {
@@ -875,7 +910,12 @@
       "clearReward": {
         "xp": 120,
         "gold": 60,
-        "essence": 8
+        "essence": 8,
+        "materials": {
+          "ore": 5,
+          "arcaneStone": 3,
+          "runeFragments": 2
+        }
       }
     },
     {
@@ -907,7 +947,12 @@
       "clearReward": {
         "xp": 220,
         "gold": 110,
-        "essence": 15
+        "essence": 15,
+        "materials": {
+          "ore": 9,
+          "arcaneStone": 5,
+          "runeFragments": 4
+        }
       }
     },
     {
@@ -931,8 +976,512 @@
       "clearReward": {
         "xp": 450,
         "gold": 250,
-        "essence": 40
+        "essence": 40,
+        "materials": {
+          "ore": 16,
+          "arcaneStone": 10,
+          "runeFragments": 8
+        }
       }
     }
-  ]
+  ],
+  "materials": {
+    "ore": {
+      "name": "Ore",
+      "icon": "m_ore",
+      "desc": "Dug from rift walls. Used at the Forge."
+    },
+    "arcaneStone": {
+      "name": "Arcane Stone",
+      "icon": "m_stone",
+      "desc": "Crystallised magic. Used to build."
+    },
+    "runeFragments": {
+      "name": "Rune Fragments",
+      "icon": "m_rune",
+      "desc": "Shards of old spells. Used for research."
+    }
+  },
+  "gear": {
+    "slots": [
+      "weapon",
+      "robe",
+      "boots",
+      "amulet",
+      "ring"
+    ],
+    "slotNames": {
+      "weapon": "Weapon",
+      "robe": "Robe",
+      "boots": "Boots",
+      "amulet": "Amulet",
+      "ring": "Ring"
+    },
+    "tiers": [
+      "Apprentice",
+      "Adept",
+      "Enchanted",
+      "Masterwork",
+      "Relic"
+    ],
+    "levelsPerTier": 3,
+    "bonusPerLevel": 0.1,
+    "statCapPct": 20,
+    "stats": {
+      "health": "Health",
+      "mana": "Mana",
+      "manaRegen": "Mana regen",
+      "stamina": "Stamina",
+      "staminaRegen": "Stamina regen",
+      "speed": "Move speed",
+      "cooldown": "Ability cooldowns",
+      "damage": "Weapon damage"
+    },
+    "bases": {
+      "wpn_apprentice_staff": {
+        "slot": "weapon",
+        "weaponId": "wpn_apprentice_staff",
+        "name": "Apprentice Staff",
+        "stats": {
+          "damage": 0
+        }
+      },
+      "wpn_scatter_staff": {
+        "slot": "weapon",
+        "weaponId": "wpn_scatter_staff",
+        "name": "Scatter Staff",
+        "stats": {
+          "damage": 0
+        }
+      },
+      "wpn_seer_staff": {
+        "slot": "weapon",
+        "weaponId": "wpn_seer_staff",
+        "name": "Seer's Staff",
+        "stats": {
+          "damage": 0
+        }
+      },
+      "robe_warded": {
+        "slot": "robe",
+        "name": "Warded Robe",
+        "stats": {
+          "health": 10,
+          "speed": -4
+        }
+      },
+      "robe_flowing": {
+        "slot": "robe",
+        "name": "Flowing Robe",
+        "stats": {
+          "speed": 6,
+          "health": -6
+        }
+      },
+      "boots_swift": {
+        "slot": "boots",
+        "name": "Swift Boots",
+        "stats": {
+          "staminaRegen": 15,
+          "mana": -5
+        }
+      },
+      "boots_iron": {
+        "slot": "boots",
+        "name": "Ironshod Boots",
+        "stats": {
+          "health": 6,
+          "staminaRegen": -8
+        }
+      },
+      "amulet_vigor": {
+        "slot": "amulet",
+        "name": "Amulet of Vigor",
+        "stats": {
+          "health": 8,
+          "manaRegen": -8
+        }
+      },
+      "amulet_focus": {
+        "slot": "amulet",
+        "name": "Amulet of Focus",
+        "stats": {
+          "mana": 15,
+          "health": -5
+        }
+      },
+      "ring_tides": {
+        "slot": "ring",
+        "name": "Ring of Tides",
+        "stats": {
+          "manaRegen": 12,
+          "speed": -3
+        }
+      },
+      "ring_haste": {
+        "slot": "ring",
+        "name": "Ring of Haste",
+        "stats": {
+          "cooldown": -6,
+          "mana": -8
+        }
+      }
+    },
+    "weaponLevelDamagePct": 4,
+    "starterItems": [
+      "wpn_apprentice_staff"
+    ],
+    "starterRecipes": [
+      "robe_warded",
+      "boots_swift",
+      "amulet_vigor",
+      "ring_tides"
+    ],
+    "craftCost": {
+      "weapon": {
+        "gold": 120,
+        "ore": 8
+      },
+      "robe": {
+        "gold": 80,
+        "ore": 5
+      },
+      "boots": {
+        "gold": 70,
+        "ore": 4
+      },
+      "amulet": {
+        "gold": 90,
+        "ore": 3,
+        "arcaneStone": 2
+      },
+      "ring": {
+        "gold": 90,
+        "ore": 3,
+        "arcaneStone": 2
+      }
+    },
+    "upgradeCost": {
+      "gold": 40,
+      "ore": 3,
+      "growth": 1.35
+    },
+    "promoteCost": {
+      "gold": 150,
+      "arcaneStone": 5,
+      "growth": 1.8
+    },
+    "lowerIsBetter": [
+      "cooldown"
+    ]
+  },
+  "sanctuary": {
+    "grid": 12,
+    "tile": 2,
+    "facilities": {
+      "dwelling": {
+        "name": "Dwelling",
+        "desc": "Your home. Bigger homes have room for more decorations.",
+        "at": [
+          1,
+          1
+        ],
+        "size": [
+          4,
+          4
+        ],
+        "models": [
+          "hut",
+          "house_04",
+          "house_04"
+        ],
+        "effect": "decor"
+      },
+      "chamber": {
+        "name": "Familiar Chamber",
+        "desc": "Team presets, Ascension and modifiers.",
+        "at": [
+          7,
+          1
+        ],
+        "size": [
+          4,
+          4
+        ],
+        "models": [
+          "house_08",
+          "house_05",
+          "house_05"
+        ],
+        "effect": "presets"
+      },
+      "forge": {
+        "name": "Arcane Forge",
+        "desc": "Craft and upgrade gear.",
+        "at": [
+          1,
+          7
+        ],
+        "size": [
+          4,
+          4
+        ],
+        "models": [
+          "workbench",
+          "blacksmith",
+          "blacksmith"
+        ],
+        "effect": "tier"
+      },
+      "library": {
+        "name": "Research Library",
+        "desc": "Research projects that unlock new gear designs.",
+        "at": [
+          7,
+          7
+        ],
+        "size": [
+          4,
+          4
+        ],
+        "models": [
+          "house_03",
+          "tower",
+          "tower"
+        ],
+        "effect": "branches"
+      }
+    },
+    "facilityCosts": {
+      "dwelling": [
+        null,
+        {
+          "gold": 400,
+          "arcaneStone": 12
+        },
+        {
+          "gold": 1200,
+          "arcaneStone": 30
+        }
+      ],
+      "chamber": [
+        null,
+        {
+          "gold": 500,
+          "arcaneStone": 20
+        },
+        {
+          "gold": 1500,
+          "arcaneStone": 45
+        }
+      ],
+      "forge": [
+        null,
+        {
+          "gold": 750,
+          "ore": 30
+        },
+        {
+          "gold": 2000,
+          "ore": 70,
+          "arcaneStone": 20
+        }
+      ],
+      "library": [
+        null,
+        {
+          "gold": 1000,
+          "runeFragments": 15
+        },
+        {
+          "gold": 2500,
+          "runeFragments": 40
+        }
+      ]
+    },
+    "decorSlotsBase": 6,
+    "decorSlotsPerLevel": 4,
+    "decor": {
+      "tree": {
+        "name": "Round Tree",
+        "model": "tree",
+        "cost": {
+          "gold": 60
+        }
+      },
+      "flowers": {
+        "name": "Flower Bush",
+        "model": "flowers",
+        "cost": {
+          "gold": 30
+        }
+      },
+      "lamp": {
+        "name": "Street Lamp",
+        "model": "lamp",
+        "cost": {
+          "gold": 50
+        }
+      },
+      "banner": {
+        "name": "Banner",
+        "model": "banner",
+        "cost": {
+          "gold": 40
+        }
+      },
+      "well": {
+        "name": "Well",
+        "model": "well",
+        "cost": {
+          "gold": 120
+        }
+      },
+      "crystal": {
+        "name": "Arcane Crystal",
+        "model": "crystal",
+        "cost": {
+          "gold": 150,
+          "arcaneStone": 3
+        }
+      },
+      "fountain": {
+        "name": "Statue Fountain",
+        "model": "fountain",
+        "cost": {
+          "gold": 300,
+          "arcaneStone": 6
+        }
+      },
+      "statue": {
+        "name": "Hero Statue",
+        "model": "statue",
+        "cost": {
+          "gold": 450,
+          "arcaneStone": 8
+        }
+      }
+    }
+  },
+  "research": {
+    "branches": [
+      "field",
+      "combat",
+      "arcana"
+    ],
+    "branchNames": {
+      "field": "Field studies",
+      "combat": "Combat studies",
+      "arcana": "Arcane studies"
+    },
+    "projects": [
+      {
+        "id": "res_bind5",
+        "branch": "field",
+        "name": "Catalogue the wilds",
+        "goal": "Bind 5 different familiars",
+        "stat": "species",
+        "target": 5,
+        "cost": {
+          "gold": 100,
+          "runeFragments": 3
+        },
+        "reward": {
+          "recipe": "amulet_focus"
+        }
+      },
+      {
+        "id": "res_types",
+        "branch": "field",
+        "name": "The three schools",
+        "goal": "Own an Arcane, a Runic and an Ancient familiar",
+        "stat": "types",
+        "target": 3,
+        "cost": {
+          "gold": 80,
+          "runeFragments": 2
+        },
+        "reward": {
+          "recipe": "boots_iron"
+        }
+      },
+      {
+        "id": "res_kills",
+        "branch": "field",
+        "name": "Know your enemy",
+        "goal": "Defeat 50 enemies",
+        "stat": "kills",
+        "target": 50,
+        "cost": {
+          "gold": 150,
+          "runeFragments": 4
+        },
+        "reward": {
+          "recipe": "wpn_seer_staff"
+        }
+      },
+      {
+        "id": "res_rifts",
+        "branch": "combat",
+        "name": "Rift cartography",
+        "goal": "Clear 3 rifts",
+        "stat": "rifts",
+        "target": 3,
+        "cost": {
+          "gold": 250,
+          "runeFragments": 6
+        },
+        "reward": {
+          "recipe": "wpn_scatter_staff"
+        }
+      },
+      {
+        "id": "res_mastery",
+        "branch": "combat",
+        "name": "Bond of mastery",
+        "goal": "Reach Mastery 3 with any familiar",
+        "stat": "mastery",
+        "target": 3,
+        "cost": {
+          "gold": 200,
+          "runeFragments": 5
+        },
+        "reward": {
+          "recipe": "robe_flowing"
+        }
+      },
+      {
+        "id": "res_boss",
+        "branch": "arcana",
+        "name": "The fallen god",
+        "goal": "Defeat the Evil God",
+        "stat": "boss",
+        "target": 1,
+        "cost": {
+          "gold": 500,
+          "runeFragments": 12
+        },
+        "reward": {
+          "recipe": "ring_haste",
+          "essence": 60
+        }
+      },
+      {
+        "id": "res_ascend",
+        "branch": "arcana",
+        "name": "Ascendant theory",
+        "goal": "Ascend any familiar to Enhanced",
+        "stat": "ascension",
+        "target": 2,
+        "cost": {
+          "gold": 400,
+          "runeFragments": 10
+        },
+        "reward": {
+          "essence": 40,
+          "arcaneStone": 10
+        }
+      }
+    ]
+  }
 }

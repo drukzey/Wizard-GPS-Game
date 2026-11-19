@@ -1,13 +1,16 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=8';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=8';
-import * as Col from './collection.js?v=8';
-import * as P from './progression.js?v=8';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=8';
+import { createSim } from './sim.js?v=9';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=9';
+import * as Col from './collection.js?v=9';
+import * as P from './progression.js?v=9';
+import * as S from './sanctuary.js?v=9';
+import * as Stage from './stage.js?v=9';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=9';
 
 const $ = (id) => document.getElementById(id);
+const VER = 9; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -68,7 +71,10 @@ const MODELS = { mage: ['kingdom', 1.85], spirit_demon: ['rivals', 2.1], fort_go
 const ATLAS = { kingdom: 'assets/kingdom_atlas.png', rivals: 'assets/rivals_atlas.png', darkfantasy: 'assets/darkfantasy_atlas.png', pirate: 'assets/pirate_atlas.png' };
 const UI_SPRITES = ['orbL', 'orbR', 'orbGlass', 'orbSheen', 'ring', 'ringBg', 'bar', 'barBg', 'box', 'circle', 'vignette', 'sigilL', 'sigilM', 'reticle',
   'i_arcane', 'i_runic', 'i_ancient', 'i_dodge', 'i_abl_arcane_bolt', 'i_abl_charged_blast', 'i_abl_spark_fan', 'i_abl_rune_shield',
-  'i_abl_retaliation_circle', 'i_abl_stone_skin', 'i_abl_serpent_dash', 'i_abl_gust', 'i_abl_ink_pool'];
+  'i_abl_retaliation_circle', 'i_abl_stone_skin', 'i_abl_serpent_dash', 'i_abl_gust', 'i_abl_ink_pool',
+  'f_panel', 'f_wide', 'f_card', 'f_card2', 'f_btn', 'f_tab', 'f_btn2', 'f_ring', 'f_diamond', 'f_bar', 'f_brackets', 'f_crest', 'f_line',
+  'n_play', 'n_journal', 'n_wizard', 'n_home', 'n_map', 'n_settings', 'n_scroll', 'n_medal', 'c_gold', 'c_essence', 'm_rune', 'm_stone', 'm_ore', 'chest',
+  's_weapon', 's_robe', 's_boots', 's_amulet', 's_ring', 'n_craft', 'n_research', 'n_forge', 'n_dwelling', 'n_chamber', 'n_library', 'n_lock'];
 const assets = { atlas: {}, models: {}, tex: {}, lib: null };
 
 async function loadImage(url) {
@@ -112,7 +118,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=8`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=9`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`);
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -121,7 +127,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = (await import('./pub/anims.js?v=8')).default;
+    const packed = { ...(await import('./pub/anims.js?v=9')).default, ...(await import('./pub/anims_m5.js?v=9')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -130,7 +136,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=8')).default, ...(await import('./pub/models_m4.js?v=8')).default };
+  const models = { ...(await import('./pub/models.js?v=9')).default, ...(await import('./pub/models_m4.js?v=9')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -144,6 +150,22 @@ async function loadAll() {
     } catch (err) { console.warn(`[assets] ${k} failed`, err); }
   }
   tick('Models');
+}
+// Sanctuary buildings, decorations and staffs load on first use (Kingdom atlas), then are cloned.
+const modelCache = {};
+const GLASS = new Set(['house_04', 'house_08', 'house_05', 'blacksmith', 'house_03', 'tower']);
+async function loadModel(name, sanct) {
+  if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
+  modelCache[name] ||= (async () => {
+    try {
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=9')).default)[name];
+      if (!b64) return null;
+      const obj = fbx.parse(await gunzipB64(b64), '');
+      obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
+      return obj;
+    } catch (err) { console.warn('[model]', name, err); return null; }
+  })();
+  const src = await modelCache[name]; return src ? src.clone(true) : null;
 }
 // Returns a wrapper group; .userData.anim is an Animator when the animation packs loaded.
 function instance(key) {
@@ -199,7 +221,7 @@ function buildArena(cfg) {
 }
 
 // ---------- game state ----------
-let cfg, sim = null, running = false, paused = true, col = null, prof = null, runTx = null;
+let cfg, sim = null, running = false, paused = true, col = null, prof = null, home = null, runTx = null;
 let loadout = store.get('ww.loadout', null);
 const vis = { player: null, enemies: new Map(), projectiles: new Map(), zones: new Map(), fx: [] };
 const tmpV = new THREE.Vector3();
@@ -319,8 +341,8 @@ function updateHud() {
   $('hpT').textContent = Math.ceil(p.hp);
   $('shT').textContent = p.shield > 0 ? `+${Math.ceil(p.shield)}` : '';
   $('hpOrb').classList.toggle('shielded', p.shield > 0);
-  $('mpFill').style.height = `${(100 * p.mana) / P.mana}%`; $('mpT').textContent = Math.floor(p.mana);
-  $('stFill').style.transform = `scaleX(${p.stamina / P.stamina})`;
+  $('mpFill').style.height = `${(100 * p.mana) / p.maxMana}%`; $('mpT').textContent = Math.floor(p.mana);
+  $('stFill').style.transform = `scaleX(${p.stamina / p.maxStamina})`;
   $('stBar').classList.toggle('low', p.stamina < P.dodge.staminaCost);
   const boss = sim.state.enemies.find((e) => e.def.archetype === 'boss');
   $('topT').textContent = `${activeRift ? `${activeRift.name} · wave ${Math.max(1, sim.state.wave + 1)} of ${activeRift.waves.length}` : `Wave ${Math.max(1, sim.state.wave + 1)}`} · ${p.kills} defeated${boss ? ` · ${boss.def.name} ${Math.ceil((100 * boss.hp) / boss.maxHp)}%` : ''}`;
@@ -341,7 +363,7 @@ const touch = { ab: [null, null, null], release: [false, false, false], releaseA
 addEventListener('keydown', (e) => {
   if (location.hash === '#debug' && e.code === 'KeyZ') { dbg.close = !dbg.close; resize(); }
   if (location.hash === '#debug' && e.code === 'KeyP') dbg.freeze = !dbg.freeze;
-  keys.add(e.code); if (e.code === 'Escape') toggleMenu(true); if (['Space', 'KeyQ', 'KeyE', 'KeyR'].includes(e.code)) e.preventDefault(); });
+  keys.add(e.code); if (e.code === 'Escape' && sim && running && $('menu').hidden) toggleMenu(true, 'play'); if (['Space', 'KeyQ', 'KeyE', 'KeyR'].includes(e.code)) e.preventDefault(); });
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => { keys.clear(); mouse.down = false; });
 const canvas = $('c');
@@ -358,8 +380,31 @@ function screenToGround(x, y) {
 const STICK_R = 55;
 const sticks = { L: { el: $('stickL'), id: null, ox: 0, oy: 0, v: null }, R: { el: $('stickR'), id: null, ox: 0, oy: 0, v: null } };
 function stickFor(x) { const leftHalf = x < innerWidth / 2; return (leftHalf !== settings.lefty) ? sticks.L : sticks.R; }
+// Camp: drag turns the wizard's platform or orbits the Sanctuary; a tap selects; pinch or wheel zooms the Sanctuary.
+const campPtr = new Map(); let campMoved = 0, pinchD = 0;
+const campOpen = () => !$('menu').hidden;
 canvas.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'mouse') return;
+  if (!campOpen()) return;
+  campPtr.set(e.pointerId, { x: e.clientX, y: e.clientY }); campMoved = 0; canvas.setPointerCapture(e.pointerId);
+  if (campPtr.size === 2) { const [a, b] = [...campPtr.values()]; pinchD = Math.hypot(a.x - b.x, a.y - b.y); }
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!campOpen()) return;
+  if (campTab === 'home') homeHover(e.clientX, e.clientY);
+  const p = campPtr.get(e.pointerId); if (!p) return;
+  const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; campMoved += Math.abs(dx) + Math.abs(dy);
+  if (campPtr.size === 2 && campTab === 'home') { const [a, b] = [...campPtr.values()], d = Math.hypot(a.x - b.x, a.y - b.y); Stage.orbitHome(0, 0, (pinchD - d) * 0.004); pinchD = d; return; }
+  if (campTab === 'home') Stage.orbitHome(dx, dy, 0); else Stage.spinHub(dx * 0.008);
+});
+const campUp = (e) => {
+  if (!campPtr.has(e.pointerId)) return;
+  campPtr.delete(e.pointerId);
+  if (campMoved < 8 && campTab === 'home' && e.type === 'pointerup') homeTap(e.clientX, e.clientY);
+};
+canvas.addEventListener('pointerup', campUp); canvas.addEventListener('pointercancel', campUp);
+canvas.addEventListener('wheel', (e) => { if (campOpen() && campTab === 'home') { e.preventDefault(); Stage.orbitHome(0, 0, e.deltaY * 0.001); } }, { passive: false });
+canvas.addEventListener('pointerdown', (e) => {
+  if (campOpen() || e.pointerType === 'mouse') return;
   const s = stickFor(e.clientX); if (s.id !== null) return;
   s.id = e.pointerId; s.ox = e.clientX; s.oy = e.clientY; s.v = { x: 0, y: 0 };
   s.el.style.display = 'block'; s.el.style.left = `${s.ox}px`; s.el.style.top = `${s.oy}px`; s.el.firstElementChild.style.transform = '';
@@ -583,59 +628,313 @@ function handleEvents(events) {
   }
 }
 
-// ---------- menu ----------
-function buildMenu() {
-  const grid = $('famGrid'); grid.innerHTML = '';
-  for (const [fid, f] of Object.entries(cfg.familiars)) {
-    const ab = cfg.abilities[f.abilityId], rIdx = RARITY.indexOf(f.rarity), owned = !!col.owned[fid];
-    if (!owned && !col.seen[fid]) continue; // undiscovered familiars stay hidden here (see Journal)
-    const b = document.createElement('button'); b.className = `fam${owned ? '' : ' locked'}`; b.dataset.fid = fid; b.style.setProperty('--c', css(f.type));
-    b.innerHTML = `<span class="slot"></span>
-      <div class="famIco">${icon(`i_${f.abilityId}`, css(f.type))}</div>
-      <div class="famBody"><div class="row"><span class="name">${f.name}</span></div>
-      <div class="row"><span class="badge" style="--c:${css(f.type)}">${icon(`i_${f.type}`, css(f.type))}${f.type.toUpperCase()}</span>
-      <span class="badge" style="--c:${css(f.rarity)}"><span class="pips">${'◆'.repeat(rIdx + 1)}</span>${f.rarity.toUpperCase()}</span></div>
-      <div class="abn">${ab.name}</div><div class="desc">${owned ? ab.counterplay : '<span class="lock">Not bound yet. Find it in Explore.</span>'}</div></div>`;
-    b.onclick = () => { if (!owned) return; const i = loadout.indexOf(fid); if (i >= 0) loadout.splice(i, 1); else if (loadout.length < 3) loadout.push(fid); else { loadout.shift(); loadout.push(fid); } refreshMenu(); };
-    grid.appendChild(b);
-  }
-  refreshMenu();
-}
-function refreshMenu() {
-  for (const b of $('famGrid').children) { const i = loadout.indexOf(b.dataset.fid); b.classList.toggle('sel', i >= 0); b.querySelector('.slot').textContent = i >= 0 ? i + 1 : ''; }
-  const letters = { arcane: 'A', runic: 'R', ancient: 'N' };
-  const comp = loadout.map((f) => letters[cfg.familiars[f].type]).sort((a, b) => 'ARN'.indexOf(a) - 'ARN'.indexOf(b)).join('');
-  $('compT').textContent = loadout.length === 3 ? `· composition ${comp}` : '';
-  $('pickT').textContent = loadout.length === 3 ? (sim && running && !sameLoadout() ? 'Changing familiars restarts the battle.' : '') : `Pick ${3 - loadout.length} more`;
-  $('startBtn').disabled = loadout.length !== 3;
-  $('startBtn').textContent = sim && running && sameLoadout() ? 'Resume' : 'Training waves';
-  $('endBtn').hidden = !(sim && running);
-  renderPresets(); renderRifts();
-}
-const mkBtn = (text, fn, cls = 'btn alt sm') => { const b = document.createElement('button'); b.className = cls; b.textContent = text; b.onclick = fn; return b; };
-function renderPresets() {
-  const box = $('presets'); box.innerHTML = '';
-  prof.presets.forEach((ps, i) => {
-    const d = document.createElement('div'); d.className = 'preset';
-    d.innerHTML = `<div class="grow"><b>Loadout ${i + 1}</b><div class="s">${ps ? ps.map((f) => cfg.familiars[f].name).join(' · ') : 'Empty'}</div></div>`;
-    const use = mkBtn('Use', () => { loadout = [...ps]; refreshMenu(); }); use.disabled = !ps;
-    const save = mkBtn(ps ? 'Replace' : 'Save current', () => { P.savePreset(cfg, prof, i, loadout); saveProf(); renderPresets(); }); save.disabled = loadout.length !== 3;
-    d.append(use, save); box.appendChild(d);
-  });
-}
+// ---------- camp (M5): one screen with the living stage behind a sheet; five places in the dock ----------
+const sprite = (k, extra = '') => `<span class="sprite" style="--m:var(--u-${k})${extra}"></span>`;
+const MAT_ICON = { gold: 'c_gold', essence: 'c_essence', ore: 'm_ore', arcaneStone: 'm_stone', runeFragments: 'm_rune' };
+const matName = (k) => (k === 'gold' ? 'Gold' : k === 'essence' ? 'Arcane Essence' : cfg.materials[k].name);
+const haveOf = (k) => (k === 'gold' ? prof.gold : k === 'essence' ? prof.essence : prof.materials[k] || 0);
+const costHtml = (cost) => `<span class="cost">${Object.entries(cost || {}).map(([k, v]) => `<span class="reward${haveOf(k) < v ? ' short' : ''}" title="${matName(k)}">${sprite(MAT_ICON[k])}${v}</span>`).join('')}</span>`;
+const rewardHtml = (r) => `${r.xp ? `<span class="reward">${r.xp} XP</span>` : ''}${['gold', 'essence'].map((k) => (r[k] ? `<span class="reward" title="${matName(k)}">${sprite(MAT_ICON[k])}${r[k]}</span>` : '')).join('')}${Object.entries(r.materials || {}).map(([k, v]) => (v ? `<span class="reward" title="${matName(k)}">${sprite(MAT_ICON[k])}${v}</span>` : '')).join('')}`;
+const mkBtn = (text, fn, cls = 'btn sm') => { const b = document.createElement('button'); b.className = cls; b.textContent = text; b.onclick = fn; return b; };
 function saveProf() { store.set('tc.profile', prof); renderWallet(); }
+function saveHome() { store.set('tc.home', home); }
 function renderWallet() {
   const L = P.levelInfo(cfg, prof.xp);
-  $('wallet').innerHTML = `<span><b>Wizard level ${L.level}</b></span><span class="bar sm"><i style="width:${L.need ? Math.round((100 * L.into) / L.need) : 100}%"></i></span>
-    <span>${L.need ? `${L.into}/${L.need} XP` : 'max level'}</span><span><b>${prof.gold}</b> Gold</span><span><b>${prof.essence}</b> Arcane Essence</span>`;
+  $('lvT').textContent = L.level;
+  $('xpI').style.width = `${L.need ? Math.round((100 * L.into) / L.need) : 100}%`;
+  $('xpT').textContent = L.need ? `${L.into} / ${L.need} XP` : 'Highest level';
+  $('wallet').innerHTML = ['gold', 'essence'].map((k) => `<span class="coin" title="${matName(k)}">${sprite(MAT_ICON[k])}${haveOf(k)}</span>`).join('');
 }
 function masteryBar(fid) {
   const mi = P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0);
   const pct = mi.nextAt === null ? 100 : Math.round((100 * (mi.xp - mi.prevAt)) / (mi.nextAt - mi.prevAt));
-  return `<span class="bar"><i style="width:${pct}%"></i></span><div class="s">Mastery ${mi.level}${mi.nextAt === null ? ' (max)' : ` · ${Math.floor(mi.xp)}/${mi.nextAt} XP`}</div>`;
+  return `<span class="bar"><i style="width:${pct}%"></i></span><div class="s">Mastery ${mi.level}${mi.nextAt === null ? ' (highest)' : ` · ${Math.floor(mi.xp)} of ${mi.nextAt}`}</div>`;
+}
+const gearView = () => S.combatLoadout(cfg, home);
+const weaponModel = () => cfg.weapons[gearView().weaponId].model;
+
+// ----- layout: which 3D stage is behind the sheet -----
+let campTab = 'play';
+const layout = { sheet: 0.56, panel: 440 };
+function sheetFraction() {
+  const el = $('sheet'); if ($('menu').hidden) return 0;
+  return innerWidth < innerHeight || innerWidth < 900 ? (el.getBoundingClientRect().height + 68) / innerHeight : 0;
+}
+function toggleMenu(open, tab) {
+  $('menu').hidden = !open; paused = open;
+  $('hud').hidden = open || !(sim && running);
+  if (open) { showTab(tab || campTab); renderWallet(); }
+  else $('homeLabels').hidden = true;
+}
+function showTab(tab) {
+  campTab = tab;
+  for (const b of document.querySelectorAll('.tab')) { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); }
+  for (const p of document.querySelectorAll('.pane')) p.hidden = p.id !== `pane-${tab}`;
+  if (tab === 'explore') document.querySelector('.tab[data-tab=explore]').classList.remove('alert');
+  $('sheet').classList.toggle('low', tab === 'home' || tab === 'wizard');
+  $('homeLabels').hidden = tab !== 'home';
+  if (tab !== 'home') { placing = null; Stage.setGhost(cfg, null); }
+  ({ play: renderPlay, explore: renderExplore, wizard: renderWizard, home: renderHome, journal: renderJournal })[tab]();
+  $('sheet').scrollTop = 0;
+}
+for (const b of document.querySelectorAll('.tab')) b.onclick = () => showTab(b.dataset.tab);
+$('menuBtn').onclick = () => toggleMenu(true, 'play');
+$('whoBtn').onclick = () => showTab('wizard');
+$('setBtn').onclick = () => { $('settingsOv').hidden = false; };
+$('setClose').onclick = () => { $('settingsOv').hidden = true; };
+
+// ----- Play -----
+function renderPlay() {
+  const box = $('resumeBox');
+  if (sim && running) {
+    box.innerHTML = `<div class="fr"><div class="card2"><div class="grow"><h3>${activeRift ? activeRift.name : 'Training'} in progress</h3><p>Wave ${Math.max(1, sim.state.wave + 1)}${activeRift ? ` of ${activeRift.waves.length}` : ''}, ${sim.state.player.kills} defeated so far.${!sameLoadout() ? ' Your team has changed: resuming keeps the old team until the run ends.' : ''}</p></div></div>
+      <div class="actions" style="margin:4px 6px 4px"></div></div>`;
+    const a = box.querySelector('.actions');
+    a.append(mkBtn('Resume', () => toggleMenu(false), 'btn'), mkBtn('End run', () => { const r = settleRun(); running = false; $('menu').hidden = true; if (r) showResults(r, 'ended'); }, 'btn alt'));
+  } else box.innerHTML = '';
+  renderRifts();
+  $('startBtn').disabled = loadout.length !== 3;
+  $('startBtn').textContent = loadout.length === 3 ? 'Start' : `Pick ${3 - loadout.length} more`;
+}
+function renderRifts() {
+  const box = $('rifts'); box.innerHTML = '';
+  const lvl = P.levelInfo(cfg, prof.xp).level;
+  for (const r of cfg.rifts) {
+    const locked = lvl < r.minLevel, done = prof.stats.rifts?.[r.id] || 0, boss = r.waves.flat().some((e) => cfg.enemies[e].archetype === 'boss');
+    const d = document.createElement('div'); d.className = 'fr quiet';
+    d.innerHTML = `<div class="card2"><div class="grow"><h3>${r.name}</h3><p>${r.desc}</p>
+      <div class="tags"><span class="tag">${r.waves.length} ${r.waves.length === 1 ? 'wave' : 'waves'}</span>${boss ? '<span class="tag" style="--c:var(--ember2)">Boss</span>' : ''}
+      ${r.modifiers.map((m) => `<span class="tag" style="--c:var(--brass)" title="${cfg.riftModifiers[m].desc}">${cfg.riftModifiers[m].name}: ${cfg.riftModifiers[m].desc.toLowerCase()}</span>`).join('')}
+      ${done ? `<span class="tag" style="--c:var(--verd)">Cleared ${done}×</span>` : ''}</div>
+      <div class="cost" style="margin-top:8px">${rewardHtml(r.clearReward)}</div>
+      ${locked ? `<p class="lock">Reach wizard level ${r.minLevel} to enter</p>` : ''}</div></div>`;
+    const b = mkBtn('Enter', () => { startBattle(r); toggleMenu(false); }, 'btn sm go'); b.disabled = locked || loadout.length !== 3;
+    d.querySelector('.card2').appendChild(b); box.appendChild(d);
+  }
+}
+$('startBtn').onclick = () => { startBattle(); toggleMenu(false); };
+
+// ----- Wizard: team, gear, bag -----
+let seg = 'team', gearSlot = 'weapon';
+for (const b of document.querySelectorAll('.seg button')) b.onclick = () => { seg = b.dataset.seg; renderWizard(); };
+function renderWizard() {
+  for (const b of document.querySelectorAll('.seg button')) b.classList.toggle('on', b.dataset.seg === seg);
+  for (const s of ['team', 'gear', 'bag']) $(`seg-${s}`).hidden = s !== seg;
+  ({ team: renderTeam, gear: renderGear, bag: renderBag })[seg]();
+  Stage.setHubLoadout(loadout, weaponModel());
+}
+function renderTeam() {
+  $('teamSlots').innerHTML = [0, 1, 2].map((i) => {
+    const fid = loadout[i], f = fid && cfg.familiars[fid];
+    return f ? `<button class="slotR" data-i="${i}" style="--c:${css(f.type)}" aria-label="Remove ${f.name}">${icon(`i_${f.abilityId}`, css(f.type))}<small>${f.name}</small></button>`
+      : `<button class="slotR empty" data-i="${i}" aria-label="Empty slot">${icon('i_arcane', '#666')}<small>Empty</small></button>`;
+  }).join('');
+  for (const b of $('teamSlots').children) b.onclick = () => { const fid = loadout[+b.dataset.i]; if (fid) { loadout.splice(+b.dataset.i, 1); teamChanged(); } };
+  const letters = { arcane: 'Arcane', runic: 'Runic', ancient: 'Ancient' };
+  $('compT').textContent = loadout.length === 3 ? `Team: ${loadout.map((f) => letters[cfg.familiars[f].type]).join(', ')}.` : '';
+  $('pickT').textContent = loadout.length === 3 ? '' : `Choose ${3 - loadout.length} more.`;
+  const grid = $('famGrid'); grid.innerHTML = '';
+  for (const [fid, f] of Object.entries(cfg.familiars)) {
+    if (!col.owned[fid]) continue;
+    const i = loadout.indexOf(fid), ab = P.effectiveAbility(cfg, col, prof, fid), mi = P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0);
+    const b = document.createElement('button'); b.className = `pick${i >= 0 ? ' sel' : ''}`; b.style.setProperty('--c', css(f.type));
+    b.setAttribute('aria-pressed', i >= 0);
+    b.innerHTML = `<div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div><b>${f.name}</b><span>${ab.name} · Mastery ${mi.level}</span></div>${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}`;
+    b.onclick = () => { if (i >= 0) loadout.splice(i, 1); else if (loadout.length < 3) loadout.push(fid); else { loadout[2] = fid; } teamChanged(); };
+    grid.appendChild(b);
+  }
+  renderPresets();
+}
+function teamChanged() { store.set('ww.loadout', loadout); renderTeam(); Stage.setHubLoadout(loadout, weaponModel()); }
+function renderPresets() {
+  const box = $('presets'); box.innerHTML = '';
+  prof.presets.forEach((ps, i) => {
+    const d = document.createElement('div'); d.className = 'row2';
+    d.innerHTML = `<div class="grow"><b>Team ${i + 1}</b><div class="s">${ps ? ps.map((f) => cfg.familiars[f].name).join(', ') : 'Empty'}</div></div>`;
+    const use = mkBtn('Use', () => { loadout = ps.filter((f) => col.owned[f]); teamChanged(); }); use.disabled = !ps;
+    const save = mkBtn(ps ? 'Replace' : 'Save', () => { P.savePreset(cfg, prof, i, loadout); saveProf(); renderPresets(); }); save.disabled = loadout.length !== 3;
+    d.append(use, save); box.appendChild(d);
+  });
+  const more = S.facilityUpgradeCost(cfg, home, 'chamber');
+  if (more) box.insertAdjacentHTML('beforeend', '<p class="s">Upgrade the Familiar Chamber in your Sanctuary to save more teams.</p>');
+}
+function statLines(totals) {
+  const G = cfg.gear;
+  const rows = Object.entries(totals).filter(([, v]) => v).map(([k, v]) => `<span>${G.stats[k]}</span><b class="${S.isUpside(cfg, k, v) ? 'up' : 'down'}">${v > 0 ? '+' : ''}${Math.round(v * 10) / 10}%</b>`);
+  return rows.length ? rows.join('') : '<span>No changes from your base stats.</span><b></b>';
+}
+function renderGear() {
+  const G = cfg.gear;
+  $('gearSlots').innerHTML = G.slots.map((s) => `<button class="slotD${s === gearSlot ? ' on' : ''}" data-s="${s}" aria-label="${G.slotNames[s]}" aria-pressed="${s === gearSlot}">${sprite(`s_${s}`, home.equipped[s] ? '' : ';opacity:.35')}<small>${G.slotNames[s]}</small></button>`).join('');
+  for (const b of $('gearSlots').children) b.onclick = () => { gearSlot = b.dataset.s; renderGear(); };
+  const items = home.items.filter((it) => G.bases[it.baseId].slot === gearSlot);
+  const list = $('gearList');
+  list.innerHTML = `<h2>${G.slotNames[gearSlot]} <span class="comp">${items.length ? 'tap to equip' : ''}</span></h2>`;
+  const rows = document.createElement('div'); rows.className = 'rows';
+  if (!items.length) rows.innerHTML = `<div class="empty">No ${G.slotNames[gearSlot].toLowerCase()} yet. Craft one at the Arcane Forge in your Sanctuary.</div>`;
+  for (const it of items) {
+    const on = home.equipped[gearSlot] === it.uid, st = S.itemStats(cfg, it), w = G.bases[it.baseId].weaponId;
+    const d = document.createElement('div'); d.className = `row2${on ? ' focus' : ''}`;
+    d.innerHTML = `<div class="grow"><b>${S.itemName(cfg, it)}</b> <span class="s">level ${it.level}</span>
+      <div class="s">${w ? cfg.weapons[w].desc + ' ' : ''}${Object.entries(st).filter(([, v]) => v).map(([k, v]) => `<span class="${S.isUpside(cfg, k, v) ? 'lvl' : 'lock'}" style="font-weight:600;color:${S.isUpside(cfg, k, v) ? '#9fd68a' : 'var(--ember2)'}">${G.stats[k]} ${v > 0 ? '+' : ''}${v}%</span>`).join(', ')}</div></div>`;
+    d.appendChild(on ? (gearSlot === 'weapon' ? Object.assign(document.createElement('span'), { className: 's', textContent: 'Equipped' }) : mkBtn('Remove', () => { S.unequip(cfg, home, gearSlot); saveHome(); renderGear(); }))
+      : mkBtn('Equip', () => { S.equip(cfg, home, it.uid); saveHome(); renderGear(); Stage.setHubLoadout(loadout, weaponModel()); }, 'btn sm go'));
+    rows.appendChild(d);
+  }
+  list.appendChild(rows);
+  const L = gearView();
+  $('statSum').innerHTML = `<span>Weapon</span><b>${cfg.weapons[L.weaponId].name}</b>${statLines(L.totals)}<span class="s" style="grid-column:1/-1">Gear bonuses are capped at ${G.statCapPct}% each, so gear helps without deciding fights.</span>`;
+}
+function renderBag() {
+  $('bagMats').innerHTML = ['gold', 'essence', ...Object.keys(cfg.materials)].map((k) => `<div class="row2">${sprite(MAT_ICON[k], ';width:30px;height:30px')}<div class="grow"><b>${matName(k)}</b><div class="s">${cfg.materials[k]?.desc || (k === 'gold' ? 'Spent on building and crafting.' : 'Spent on Ascension and research rewards.')}</div></div><b>${haveOf(k)}</b></div>`).join('');
+  $('bagItems').innerHTML = home.items.map((it) => `<div class="row2">${sprite(`s_${cfg.gear.bases[it.baseId].slot}`, ';width:28px;height:28px')}<div class="grow"><b>${S.itemName(cfg, it)}</b><div class="s">Level ${it.level}${Object.values(home.equipped).includes(it.uid) ? ' · equipped' : ''}</div></div></div>`).join('') || '<div class="empty">No equipment yet.</div>';
 }
 
-// ---------- runs and results (M3) ----------
+// ----- Sanctuary -----
+let homeView = null, placing = null, selDecor = null;
+function renderHome() {
+  Stage.syncHome(cfg, home);
+  const box = $('homeBody'), F = cfg.sanctuary.facilities;
+  if (!homeView) {
+    box.innerHTML = `<h2>Sanctuary <span class="comp">tap a building to go inside</span></h2><div class="rows" id="facRows"></div>`;
+    for (const [id, f] of Object.entries(F)) {
+      const d = document.createElement('div'); d.className = 'row2';
+      d.innerHTML = `${sprite(`n_${id}`, ';width:30px;height:30px')}<div class="grow"><b>${f.name}</b> <span class="lvl">level ${home.facilities[id]}</span><div class="s">${effectText(id)}</div></div>`;
+      d.appendChild(mkBtn('Open', () => openFacility(id), 'btn sm go')); $('facRows').appendChild(d);
+    }
+    return;
+  }
+  const id = homeView, f = F[id], up = S.facilityUpgradeCost(cfg, home, id);
+  box.innerHTML = `<div class="placeBar" style="margin-top:6px"><button class="btn sm" id="facBack">‹ Sanctuary</button></div>
+    <h2>${f.name} <span class="comp">level ${home.facilities[id]}</span></h2><p>${f.desc} ${effectText(id)}</p>
+    <div class="row2"><div class="grow">${up ? `<b>Upgrade to level ${home.facilities[id] + 1}</b><div class="s">${effectText(id, home.facilities[id] + 1)}</div>${costHtml(up)}` : '<b>Fully upgraded</b><div class="s">More levels arrive in a later update.</div>'}</div></div>
+    <div id="facBody"></div>`;
+  $('facBack').onclick = () => { homeView = null; placing = null; Stage.setGhost(cfg, null); renderHome(); };
+  if (up) {
+    const b = mkBtn('Upgrade', () => { const r = S.upgradeFacility(cfg, home, prof, id); if (r.ok) { saveHome(); saveProf(); toast(`${f.name} upgraded to level ${r.level}.`, '#d7b26b'); } renderHome(); }, 'btn sm go');
+    b.disabled = !S.canAfford(prof, up); box.querySelector('.row2').appendChild(b);
+  }
+  ({ chamber: facChamber, forge: facForge, library: facLibrary, dwelling: facDwelling })[id]($('facBody'));
+}
+function effectText(id, level) {
+  const e = S.facilityEffect(cfg, home, id, level ?? home.facilities[id]);
+  if (e.decorSlots) return `Room for ${e.decorSlots} decorations.`;
+  if (e.presets) return `${e.presets} saved teams.`;
+  if (e.tier) return `Crafts and upgrades gear up to ${e.tier}.`;
+  if (e.branches) return `Research: ${e.branches.map((b) => cfg.research.branchNames[b].toLowerCase()).join(', ')}.`;
+  return '';
+}
+function openFacility(id) { homeView = id; showTab('home'); Stage.focusHome?.(id); }
+function facChamber(el) {
+  el.innerHTML = '<h2>Familiars <span class="comp">Ascension and modifiers</span></h2><div class="rows" id="chRows"></div>';
+  for (const fid of Object.keys(col.owned)) {
+    const f = cfg.familiars[fid], c = P.ascensionCost(cfg, col, fid), ready = c && !c.maxed && !c.short;
+    const d = document.createElement('div'); d.className = `row2${ready ? ' focus' : ''}`;
+    d.innerHTML = `<div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow"><b>${f.name}</b> <span class="s">${cfg.ascension.ranks[c.rank]}${ready ? ' · <span class="lvl">ready to Ascend</span>' : ''}</span>${masteryBar(fid)}</div>`;
+    d.appendChild(mkBtn('Manage', () => openDetail(fid))); $('chRows').appendChild(d);
+  }
+}
+function facForge(el) {
+  const G = cfg.gear;
+  el.innerHTML = `<h2>Craft <span class="comp">designs you know</span></h2><div class="rows" id="fgCraft"></div><h2>Upgrade <span class="comp">never fails or breaks</span></h2><div class="rows" id="fgUp"></div>`;
+  for (const id of home.recipes) {
+    const b = G.bases[id], cost = S.craftCost(cfg, id), d = document.createElement('div'); d.className = 'row2';
+    d.innerHTML = `${sprite(`s_${b.slot}`, ';width:28px;height:28px')}<div class="grow"><b>${b.name}</b><div class="s">${b.weaponId ? cfg.weapons[b.weaponId].desc : Object.entries(b.stats).map(([k, v]) => `${G.stats[k]} ${v > 0 ? '+' : ''}${v}%`).join(', ')}</div>${costHtml(cost)}</div>`;
+    const btn = mkBtn('Craft', () => { const r = S.craft(cfg, home, prof, id); if (r.ok) { saveHome(); saveProf(); toast(`Crafted ${S.itemName(cfg, r.item)}. Equip it from Wizard › Gear.`, '#d7b26b', () => { seg = 'gear'; gearSlot = b.slot; showTab('wizard'); }); } renderHome(); }, 'btn sm go');
+    btn.disabled = !S.canAfford(prof, cost); d.appendChild(btn); $('fgCraft').appendChild(d);
+  }
+  const locked = G.slots.flatMap((s) => Object.keys(G.bases).filter((b) => G.bases[b].slot === s && !home.recipes.includes(b)));
+  if (locked.length) $('fgCraft').insertAdjacentHTML('beforeend', `<p class="s">${locked.length} more designs can be found through research at the Library.</p>`);
+  for (const it of home.items) {
+    const u = S.upgradeInfo(cfg, home, it.uid), d = document.createElement('div'); d.className = 'row2';
+    const what = u.kind === 'level' ? `Level ${it.level} → ${it.level + 1}` : u.kind === 'promote' ? `Temper into ${G.tiers[it.tier + 1]}${u.locked ? ` (needs Forge level ${it.tier + 2})` : ''}` : 'At the highest tier';
+    d.innerHTML = `${sprite(`s_${G.bases[it.baseId].slot}`, ';width:28px;height:28px')}<div class="grow"><b>${S.itemName(cfg, it)}</b><div class="s">${what}</div>${u.cost ? costHtml(u.cost) : ''}</div>`;
+    if (u.cost) { const btn = mkBtn(u.kind === 'promote' ? 'Temper' : 'Upgrade', () => { if (S.upgrade(cfg, home, prof, it.uid).ok) { saveHome(); saveProf(); } renderHome(); }); btn.disabled = u.locked || !S.canAfford(prof, u.cost); d.appendChild(btn); }
+    $('fgUp').appendChild(d);
+  }
+}
+function facLibrary(el) {
+  el.innerHTML = '<h2>Research</h2><div class="rows" id="lbRows"></div>';
+  for (const r of S.researchState(cfg, home, prof, col)) {
+    const d = document.createElement('div'); d.className = `row2${r.done ? ' done' : r.ready ? ' focus' : ''}`;
+    const rw = r.reward.recipe ? `Unlocks the ${cfg.gear.bases[r.reward.recipe].name} design` : '';
+    const extra = [r.reward.essence ? `${r.reward.essence} Arcane Essence` : '', r.reward.arcaneStone ? `${r.reward.arcaneStone} Arcane Stone` : ''].filter(Boolean).join(' and ');
+    d.innerHTML = `${sprite('n_research', ';width:28px;height:28px')}<div class="grow"><b>${r.name}</b> <span class="s">${cfg.research.branchNames[r.branch]}</span>
+      <div class="s">${r.goal}: ${r.progress} of ${r.target}. ${[rw, extra].filter(Boolean).join(', plus ')}.</div>
+      <span class="bar"><i style="width:${(100 * r.progress) / r.target}%"></i></span>${r.done ? '' : costHtml(r.cost)}
+      ${!r.open ? '<div class="lock">Upgrade the Library to open this branch</div>' : ''}</div>`;
+    if (!r.done) { const b = mkBtn('Study', () => { if (S.completeResearch(cfg, home, prof, col, r.id).ok) { saveHome(); saveProf(); toast(`Research complete: ${r.name}.`, '#d7b26b'); } renderHome(); }, 'btn sm go'); b.disabled = !r.ready || !S.canAfford(prof, r.cost); d.appendChild(b); }
+    else d.insertAdjacentHTML('beforeend', '<span class="s">Done</span>');
+    $('lbRows').appendChild(d);
+  }
+}
+function facDwelling(el) {
+  const D2 = cfg.sanctuary.decor, slots = S.decorSlots(cfg, home);
+  el.innerHTML = `<h2>Decorations <span class="comp">${home.decor.placed.length} of ${slots} placed</span></h2>
+    ${placing !== null ? `<div class="fr quiet"><div class="card2"><div class="grow"><b>${selDecor !== null ? 'Move' : 'Place'} the ${D2[placing].name}</b><div class="s">Tap a tile on the plot. Green means it fits.</div></div></div><div class="placeBar" style="margin:4px 6px"><button class="btn sm" id="plRot">Rotate</button><button class="btn sm" id="plCancel">Done</button></div></div>` : ''}
+    ${selDecor !== null && placing === null ? `<div class="fr quiet"><div class="card2"><div class="grow"><b>${D2[home.decor.placed[selDecor].id].name}</b><div class="s">Selected on the plot.</div></div></div><div class="placeBar" style="margin:4px 6px"><button class="btn sm" id="dMove">Move</button><button class="btn sm" id="dRot">Rotate</button><button class="btn sm" id="dStore">Put away</button><button class="btn sm" id="dDone">Done</button></div></div>` : ''}
+    <div class="rows" id="dcRows"></div>`;
+  if ($('plRot')) $('plRot').onclick = () => { placeRot = (placeRot + 1) % 4; if (selDecor !== null) { S.rotateDecor(home, selDecor); saveHome(); Stage.syncHome(cfg, home); } };
+  if ($('plCancel')) $('plCancel').onclick = () => { placing = null; selDecor = null; Stage.setGhost(cfg, null); renderHome(); };
+  if ($('dMove')) $('dMove').onclick = () => { placing = home.decor.placed[selDecor].id; placeRot = home.decor.placed[selDecor].rot; Stage.setGhost(cfg, placing); renderHome(); };
+  if ($('dRot')) $('dRot').onclick = () => { S.rotateDecor(home, selDecor); saveHome(); Stage.syncHome(cfg, home); };
+  if ($('dStore')) $('dStore').onclick = () => { S.storeDecor(home, selDecor); selDecor = null; saveHome(); renderHome(); };
+  if ($('dDone')) $('dDone').onclick = () => { selDecor = null; renderHome(); };
+  for (const [id, d] of Object.entries(D2)) {
+    const owned = home.decor.owned[id] || 0, used = home.decor.placed.filter((p) => p.id === id).length;
+    const row = document.createElement('div'); row.className = 'row2';
+    row.innerHTML = `<div class="grow"><b>${d.name}</b> <span class="s">${owned ? `${used} of ${owned} placed` : ''}</span>${costHtml(d.cost)}</div>`;
+    const buy = mkBtn('Buy', () => { if (S.buyDecor(cfg, home, prof, id).ok) { saveHome(); saveProf(); } renderHome(); }); buy.disabled = !S.canAfford(prof, d.cost);
+    const place = mkBtn('Place', () => { placing = id; selDecor = null; placeRot = 0; Stage.setGhost(cfg, id); renderHome(); }, 'btn sm go');
+    place.disabled = used >= owned || home.decor.placed.length >= slots;
+    row.append(buy, place); $('dcRows').appendChild(row);
+  }
+}
+let placeRot = 0;
+function homeTap(sx, sy) {
+  const hit = Stage.pickHome(cfg, sx, sy);
+  if (placing !== null && hit.tile) {
+    if (selDecor !== null) { if (S.moveDecor(cfg, home, selDecor, hit.tile.x, hit.tile.z)) { saveHome(); placing = null; Stage.setGhost(cfg, null); } else toast('That tile is taken.'); }
+    else { const r = S.placeDecor(cfg, home, placing, hit.tile.x, hit.tile.z, placeRot); if (r.ok) { saveHome(); if ((home.decor.owned[placing] || 0) <= home.decor.placed.filter((p) => p.id === placing).length) { placing = null; Stage.setGhost(cfg, null); } } else toast(r.reason === 'full' ? 'No room left. Upgrade your Dwelling for more.' : 'That spot is taken.'); }
+    renderHome(); return;
+  }
+  if (hit.decor !== null) { homeView = 'dwelling'; selDecor = hit.decor; placing = null; renderHome(); return; }
+  if (hit.facility) openFacility(hit.facility);
+}
+function homeHover(sx, sy) {
+  if (placing === null) return;
+  const hit = Stage.pickHome(cfg, sx, sy); if (!hit.tile) return;
+  Stage.moveGhost(cfg, hit.tile.x, hit.tile.z, placeRot, S.canPlace(cfg, home, hit.tile.x, hit.tile.z, selDecor ?? -1));
+}
+function updateHomeLabels() {
+  const box = $('homeLabels'); if (box.hidden) return;
+  for (const id of Object.keys(cfg.sanctuary.facilities)) {
+    let el = box.querySelector(`[data-f=${id}]`);
+    if (!el) { el = document.createElement('button'); el.className = 'hLabel'; el.dataset.f = id; el.onclick = () => openFacility(id); box.appendChild(el); }
+    el.innerHTML = `${sprite(`n_${id}`)}${cfg.sanctuary.facilities[id].name} <small>${home.facilities[id]}</small>`;
+    const p = Stage.labelPos(id); el.style.display = p ? '' : 'none'; if (p) { el.style.left = `${p.x}px`; el.style.top = `${p.y}px`; }
+  }
+}
+
+// ----- Journal -----
+function renderJournal() {
+  if (!col) return;
+  const ids = Object.keys(cfg.familiars), owned = ids.filter((f) => col.owned[f]);
+  $('colT').textContent = `${owned.length} of ${ids.length} bound`;
+  $('journal').innerHTML = ids.map((fid) => {
+    const f = cfg.familiars[fid], o = col.owned[fid], seen = col.seen[fid], r = rarityCfg(f.rarity), ab = cfg.abilities[f.abilityId];
+    if (!o && !seen) return `<div class="jc unknown"><div class="famIco" style="--c:#555">${icon('i_arcane', '#555')}</div><div><div class="t">Undiscovered</div><div class="s">Keep exploring.</div></div></div>`;
+    const c = o && P.ascensionCost(cfg, col, fid);
+    return `<div class="jc"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow" style="flex:1">
+      <div class="t">${f.name}</div>
+      <div style="display:flex;gap:5px;flex-wrap:wrap;margin:4px 0"><span class="badge" style="--c:${css(f.type)}">${icon(`i_${f.type}`, css(f.type))}${f.type[0].toUpperCase() + f.type.slice(1)}</span><span class="badge" style="--c:${r.color}">${'◆'.repeat(r.pips)} ${r.label}</span></div>
+      <div class="s">${o ? `${ab.name} · bound ${o.captures}× · ${o.credits} ${o.credits === 1 ? 'credit' : 'credits'} · ${cfg.ascension.ranks[c.rank]}` : 'Seen in the wilds. Not bound yet.'}</div>
+      ${o ? `${masteryBar(fid)}<button class="btn sm" data-det="${fid}" style="margin-top:8px">Manage</button>` : ''}</div></div>`;
+  }).join('');
+  $('journal').onclick = (ev) => { const b = ev.target.closest('[data-det]'); if (b) openDetail(b.dataset.det); };
+}
+
+// ---------- runs and results ----------
 /** Grant this run's rewards once. Safe to call twice: the transaction id is spent on the first call. */
 function settleRun() {
   if (!sim || !runTx) return null;
@@ -644,51 +943,60 @@ function settleRun() {
   const won = st.won && !!activeRift;
   const rw = P.battleRewards(cfg, { kills: st.player.kills, wavesCleared: cleared, clearReward: won ? activeRift.clearReward : null, slots: st.slots.map((s) => ({ familiarId: s.familiarId, ...s.contrib })) });
   const g = P.grant(cfg, prof, tx, rw);
-  if (g.applied) Object.assign(prof.stats, { battles: prof.stats.battles + 1, bestWave: Math.max(prof.stats.bestWave, cleared), kills: prof.stats.kills + st.player.kills });
-  saveProf();
-  if (g.applied && won) prof.stats.rifts = { ...(prof.stats.rifts || {}), [activeRift.id]: ((prof.stats.rifts || {})[activeRift.id] || 0) + 1 };
+  if (g.applied) {
+    Object.assign(prof.stats, { battles: prof.stats.battles + 1, bestWave: Math.max(prof.stats.bestWave, cleared), kills: prof.stats.kills + st.player.kills });
+    if (won) prof.stats.rifts = { ...(prof.stats.rifts || {}), [activeRift.id]: ((prof.stats.rifts || {})[activeRift.id] || 0) + 1 };
+  }
   saveProf();
   return { cleared, kills: st.player.kills, rw, g, won, rift: activeRift, fids: st.slots.map((s) => s.familiarId) };
 }
 function showResults(r, outcome) {
-  $('resH').textContent = outcome === 'won' ? `${r.rift.name} cleared!` : outcome === 'defeat' ? 'Defeated' : 'Run complete';
-  $('defeatT').textContent = `Waves cleared: ${r.cleared} · Enemies defeated: ${r.kills}`;
+  $('hud').hidden = true;
+  $('resH').textContent = outcome === 'won' ? `${r.rift.name} cleared` : outcome === 'defeat' ? 'Defeated' : 'Run complete';
+  $('defeatT').textContent = `${r.cleared} ${r.cleared === 1 ? 'wave' : 'waves'} cleared, ${r.kills} ${r.kills === 1 ? 'enemy' : 'enemies'} defeated`;
   const M = cfg.progression.mastery;
-  let h = r.won ? `<p class="lvl">Clear bonus: +${r.rift.clearReward.xp} XP · +${r.rift.clearReward.gold} Gold · +${r.rift.clearReward.essence} Arcane Essence (included below)</p>` : '';
-  h += r.rw.xp ? `<p><b>+${r.rw.xp} XP · +${r.rw.gold} Gold${r.rw.essence ? ` · +${r.rw.essence} Arcane Essence` : ''}</b></p>` : '<p>No rewards this time. Defeat at least one enemy to earn rewards.</p>';
-  if (r.g.applied && r.g.wizard.to > r.g.wizard.from) h += `<p class="lvl">Wizard level ${r.g.wizard.to}!</p>`;
+  let h = r.rw.xp ? `<div class="fr quiet"><div class="card2">${sprite('chest', ';width:64px;height:64px')}<div class="grow"><h3>Rewards</h3><div class="cost">${rewardHtml(r.rw)}</div>${r.won ? '<div class="s">Includes the rift clear bonus.</div>' : ''}</div></div></div>`
+    : '<p>No rewards this time. Defeat at least one enemy to earn rewards.</p>';
+  if (r.g.applied && r.g.wizard.to > r.g.wizard.from) h += `<p class="lvl" style="text-align:center;font-size:18px">Wizard level ${r.g.wizard.to}</p>`;
   for (const fid of r.fids) {
     const m = r.g.mastery?.[fid], f = cfg.familiars[fid];
-    const note = m ? `+${m.gained} Mastery${m.to > m.from ? ` · <span class="lvl">Mastery ${m.to}!${m.from < M.branchAt && m.to >= M.branchAt ? ' Modifiers unlocked.' : ''}</span>` : ''}`
+    const note = m ? `+${m.gained} Mastery${m.to > m.from ? ` · <span class="lvl">Mastery ${m.to}${m.from < M.branchAt && m.to >= M.branchAt ? ', modifiers unlocked' : ''}</span>` : ''}`
       : r.rw.xp ? 'No Mastery: it didn\'t hit or block anything this run.' : '';
-    h += `<div class="res"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow"><b>${f.name}</b><div class="s">${note}</div>${masteryBar(fid)}</div></div>`;
+    h += `<div class="res"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow"><b style="font:700 17px var(--display)">${f.name}</b><div class="s">${note}</div>${masteryBar(fid)}</div></div>`;
   }
-  h += `<p class="s"><b>Next goal:</b> ${nextGoal(r.fids)}</p>`;
+  h += `<p class="s" style="margin-top:12px"><b style="color:var(--bone)">Next:</b> ${nextGoal(r.fids)}</p>`;
   $('resBody').innerHTML = h; $('defeat').hidden = false; paused = true;
+  $('retryBtn').textContent = r.rift ? `Enter ${r.rift.name} again` : 'Train again';
 }
 function nextGoal(fids) {
   const ranks = cfg.ascension.ranks;
-  for (const fid of Object.keys(col.owned)) { const c = P.ascensionCost(cfg, col, fid); if (c && !c.maxed && !c.short) return `${cfg.familiars[fid].name} can Ascend to ${ranks[c.next]}. Open it in the Journal.`; }
+  for (const fid of Object.keys(col.owned)) { const c = P.ascensionCost(cfg, col, fid); if (c && !c.maxed && !c.short) return `${cfg.familiars[fid].name} can Ascend to ${ranks[c.next]} in the Familiar Chamber.`; }
+  const r = S.researchState(cfg, home, prof, col).find((x) => x.ready && S.canAfford(prof, x.cost));
+  if (r) return `Research "${r.name}" is ready at the Library.`;
+  const up = Object.keys(cfg.sanctuary.facilities).find((id) => { const c = S.facilityUpgradeCost(cfg, home, id); return c && S.canAfford(prof, c); });
+  if (up) return `You can afford to upgrade the ${cfg.sanctuary.facilities[up].name}.`;
   const best = fids.map((fid) => ({ fid, mi: P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0) })).filter((x) => x.mi.nextAt !== null).sort((a, b) => (a.mi.nextAt - a.mi.xp) - (b.mi.nextAt - b.mi.xp))[0];
-  return best ? `${Math.ceil(best.mi.nextAt - best.mi.xp)} more Mastery for ${cfg.familiars[best.fid].name} to reach Mastery ${best.mi.level + 1}.` : 'Bind more familiars in Explore.';
+  return best ? `${Math.ceil(best.mi.nextAt - best.mi.xp)} more Mastery for ${cfg.familiars[best.fid].name} to reach Mastery ${best.mi.level + 1}.` : 'Bind more familiars from the Map.';
 }
+$('retryBtn').onclick = () => { $('defeat').hidden = true; startBattle(activeRift); paused = false; $('hud').hidden = false; };
+$('loadoutBtn').onclick = () => { $('defeat').hidden = true; toggleMenu(true, 'play'); };
 
-// ---------- familiar detail: Mastery, Ascension, modifier (M3) ----------
+// ---------- familiar detail: Mastery, Ascension, modifier ----------
 let detFid = null;
-function openDetail(fid) { detFid = fid; $('menu').hidden = true; $('famDet').hidden = false; renderDetail(); }
+function openDetail(fid) { detFid = fid; $('famDet').hidden = false; renderDetail(); }
 function renderDetail() {
   const fid = detFid, f = cfg.familiars[fid], ab = P.effectiveAbility(cfg, col, prof, fid), ranks = cfg.ascension.ranks;
   const mi = P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0), c = P.ascensionCost(cfg, col, fid), M = cfg.progression.mastery;
   const cur = prof.familiars[fid]?.modifierId || null, locked = mi.level < M.branchAt;
-  const asc = c.maxed ? 'Fully ascended.' : `Next rank, <b>${ranks[c.next]}</b>, needs ${c.need} duplicate ${c.need === 1 ? 'credit' : 'credits'}. You have ${c.have}.${c.short ? ` You can cover the missing ${c.short} with ${c.essenceForShort} Arcane Essence (you have ${prof.essence}).` : ''}`;
-  $('detBody').innerHTML = `<h1>${f.name}</h1><div class="s">${f.type.toUpperCase()} · ${f.rarity} · <b>${ab.name}</b>${ab.modifierName ? ` with ${ab.modifierName}` : ''}. Changes apply from your next battle.</div>
+  const asc = c.maxed ? 'Fully ascended.' : `The next rank, ${ranks[c.next]}, needs ${c.need} duplicate ${c.need === 1 ? 'credit' : 'credits'}. You have ${c.have}.${c.short ? ` You can cover the missing ${c.short} with ${c.essenceForShort} Arcane Essence (you have ${prof.essence}).` : ''}`;
+  $('detBody').innerHTML = `<h1>${f.name}</h1><p>${f.type[0].toUpperCase() + f.type.slice(1)}, ${f.rarity}. Ability: <b style="color:var(--bone)">${ab.name}</b>${ab.modifierName ? ` with ${ab.modifierName}` : ''}. Changes apply from your next battle.</p>
     <h2>Mastery</h2>${masteryBar(fid)}<p class="s">Earned when this familiar's ability damages enemies or blocks damage in battle.</p>
-    <h2>Ascension · ${ranks[c.rank]} (${c.rank} of ${ranks.length - 1})</h2><p class="s">Each rank adds ${Math.round(cfg.progression.ascension.potencyPerRank * 1000) / 10}% to ${ab.name}'s power. ${asc}</p><div class="actions" id="ascAct"></div>
+    <h2>Ascension <span class="comp">${ranks[c.rank]}, ${c.rank} of ${ranks.length - 1}</span></h2><p class="s">Each rank adds ${Math.round(cfg.progression.ascension.potencyPerRank * 1000) / 10}% to ${ab.name}'s power. ${asc}</p><div class="actions" id="ascAct"></div>
     <h2>Modifier <span class="comp">${locked ? `unlocks at Mastery ${M.branchAt}` : 'free to change'}</span></h2><div class="mods" id="mods"></div>`;
   if (!c.maxed) {
     const b = mkBtn(c.short ? `Ascend (${c.need - c.short} credits + ${c.essenceForShort} Essence)` : `Ascend (${c.need} ${c.need === 1 ? 'credit' : 'credits'})`, () => {
       const r = P.ascend(cfg, col, prof, fid, c.short > 0);
-      if (r.ok) { saveCol(); saveProf(); toast(`${f.name} reached ${ranks[r.rank]}.`, '#d9b46a'); }
+      if (r.ok) { saveCol(); saveProf(); toast(`${f.name} reached ${ranks[r.rank]}.`, '#d7b26b'); }
       renderDetail();
     }, 'btn');
     b.disabled = c.short > 0 && prof.essence < c.essenceForShort;
@@ -700,36 +1008,11 @@ function renderDetail() {
     $('mods').appendChild(b);
   }
 }
-$('detClose').onclick = () => { $('famDet').hidden = true; toggleMenu(true, 'journal'); };
-$('endBtn').onclick = () => { const r = settleRun(); running = false; $('menu').hidden = true; if (r) showResults(r, 'ended'); };
-let activeLoadout = null;
-const sameLoadout = () => activeLoadout && activeLoadout.join() === loadout.join();
-function toggleMenu(open, tab) { $('menu').hidden = !open; paused = open; if (open) { if (tab) showTab(tab); refreshMenu(); renderExplore(); renderJournal(); renderWallet(); } }
-function showTab(tab) {
-  for (const b of document.querySelectorAll('.tab')) b.classList.toggle('on', b.dataset.tab === tab);
-  for (const p of document.querySelectorAll('.pane')) p.hidden = p.id !== `pane-${tab}`;
-  if (tab === 'explore') document.querySelector('.tab[data-tab=explore]').classList.remove('alert');
-  if (tab === 'battle') buildMenu();
-}
-for (const b of document.querySelectorAll('.tab')) b.onclick = () => showTab(b.dataset.tab);
-$('menuBtn').onclick = () => toggleMenu(true);
-$('startBtn').onclick = () => { if (!(sim && running && sameLoadout())) startBattle(); toggleMenu(false); };
-function renderRifts() {
-  const box = $('rifts'); box.innerHTML = '';
-  const lvl = P.levelInfo(cfg, prof.xp).level;
-  for (const r of cfg.rifts) {
-    const locked = lvl < r.minLevel, done = prof.stats.rifts?.[r.id] || 0, c = r.clearReward;
-    const mods = r.modifiers.map((m) => `<b>${cfg.riftModifiers[m].name}</b>: ${cfg.riftModifiers[m].desc}`).join(' · ');
-    const d = document.createElement('div'); d.className = 'preset';
-    d.innerHTML = `<div class="grow"><b>${r.name}</b> <span class="comp">${r.waves.length} ${r.waves.length === 1 ? 'wave' : 'waves'}${done ? ` · cleared ${done}×` : ''}</span>
-      <div class="s">${r.desc}${mods ? `<br>${mods}` : ''}<br>Clear bonus: ${c.xp} XP · ${c.gold} Gold · ${c.essence} Essence${locked ? `<br><span class="lock">Unlocks at wizard level ${r.minLevel}</span>` : ''}</div></div>`;
-    const b = mkBtn('Enter', () => { startBattle(r); toggleMenu(false); }, 'btn sm'); b.disabled = locked || loadout.length !== 3;
-    d.appendChild(b); box.appendChild(d);
-  }
-}
-$('retryBtn').onclick = () => { $('defeat').hidden = true; startBattle(activeRift); paused = false; };
-$('loadoutBtn').onclick = () => { $('defeat').hidden = true; toggleMenu(true); };
+$('detClose').onclick = () => { $('famDet').hidden = true; if (!$('menu').hidden) showTab(campTab); };
 
+// ---------- starting a battle ----------
+let activeLoadout = null, activeRift = null;
+const sameLoadout = () => activeLoadout && activeLoadout.join() === loadout.join();
 function clearVisuals() {
   for (const g of vis.enemies.values()) scene.remove(g);
   for (const m of vis.projectiles.values()) scene.remove(m);
@@ -737,19 +1020,20 @@ function clearVisuals() {
   for (const f of vis.fx) { if (f.mesh) fxGroup.remove(f.mesh); if (f.el) f.el.remove(); }
   vis.enemies.clear(); vis.projectiles.clear(); vis.zones.clear(); vis.fx.length = 0; lastPos.clear();
 }
-let activeRift = null;
 function startBattle(rift = null) {
   store.set('ww.loadout', loadout);
-  const prev = settleRun(); // switching loadouts mid-run still pays out the run so far
+  const prev = settleRun(); // starting again mid-run still pays out the run so far
   if (prev && prev.rw.xp) toast(`Previous run: +${prev.rw.xp} XP, +${prev.rw.gold} Gold`);
   activeLoadout = [...loadout]; activeRift = rift;
   clearVisuals();
-  const seed = (Math.random() * 1e9) | 0;
-  sim = createSim(cfg, { weaponId: cfg.defaultLoadout.weaponId, familiarIds: activeLoadout, abilities: activeLoadout.map((fid) => P.effectiveAbility(cfg, col, prof, fid)) }, seed, { encounter: rift });
+  const seed = (Math.random() * 1e9) | 0, G = gearView();
+  const abilities = activeLoadout.map((fid) => { const ab = P.effectiveAbility(cfg, col, prof, fid); return { ...ab, cooldown: ab.cooldown * G.cooldownMult }; });
+  sim = createSim(cfg, { weaponId: G.weaponId, weapon: G.weapon, player: G.player, familiarIds: activeLoadout, abilities }, seed, { encounter: rift });
   runTx = `battle:${Date.now().toString(36)}:${seed}`;
   if (vis.player) scene.remove(vis.player, vis.player.userData.aimPivot);
   vis.player = playerVisual();
-  buildAbilityButtons(); running = true;
+  Stage.attachStaff(vis.player.userData.body, cfg.weapons[G.weaponId].model);
+  buildAbilityButtons(); running = true; $('hud').hidden = false;
 }
 
 // ---------- collection (M2) ----------
@@ -800,7 +1084,7 @@ function renderExplore() {
       <div class="grow"><div class="rb">${'◆'.repeat(r.pips)} ${r.label.toUpperCase()}</div><div class="nm">${f.name}</div>
       <div class="row" style="display:flex;gap:6px;margin-top:4px"><span class="badge" style="--c:${css(f.type)}">${icon(`i_${f.type}`, css(f.type))}${f.type.toUpperCase()}</span></div>
       <div class="meta">${owned ? `Owned · binding again gives a duplicate credit` : 'New familiar · binding unlocks its ability'} · ${e.attemptsLeft} ${e.attemptsLeft === 1 ? 'try' : 'tries'} left · leaves in ${fmtTime(left)}${e.source === 'battle' ? ' · drawn out by battle' : ''}</div></div>`;
-    const b = document.createElement('button'); b.className = 'btn'; b.textContent = 'Bind'; b.onclick = () => openBinding(e.id);
+    const b = document.createElement('button'); b.className = 'btn sm go'; b.textContent = 'Bind'; b.onclick = () => openBinding(e.id);
     d.appendChild(b); list.appendChild(d);
   }
 }
@@ -810,25 +1094,9 @@ function renderLegend() {
     return `<div style="--c:${r.color}"><b>${'◆'.repeat(r.pips)} ${r.label}</b> ${r.share}%${has ? '' : ' (none yet)'}</div>`;
   }).join('');
 }
-function renderJournal() {
-  if (!col) return;
-  const ids = Object.keys(cfg.familiars), owned = ids.filter((f) => col.owned[f]);
-  $('colT').textContent = `· ${owned.length} of ${ids.length} bound`;
-  $('journal').onclick = (ev) => { const b = ev.target.closest('[data-det]'); if (b) openDetail(b.dataset.det); };
-  $('journal').innerHTML = ids.map((fid) => {
-    const f = cfg.familiars[fid], o = col.owned[fid], seen = col.seen[fid], r = rarityCfg(f.rarity), ab = cfg.abilities[f.abilityId];
-    if (!o && !seen) return `<div class="jc unknown"><div class="famIco" style="--c:#555">${icon('i_arcane', '#555')}</div><div><div class="t">Undiscovered</div><div class="s">Keep exploring.</div></div></div>`;
-    const c = o && P.ascensionCost(cfg, col, fid);
-    return `<div class="jc"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div>
-      <div class="t">${f.name}</div>
-      <div class="row" style="display:flex;gap:5px;flex-wrap:wrap;margin:4px 0"><span class="badge" style="--c:${css(f.type)}">${icon(`i_${f.type}`, css(f.type))}${f.type.toUpperCase()}</span><span class="badge" style="--c:${r.color}">${'◆'.repeat(r.pips)} ${r.label.toUpperCase()}</span></div>
-      <div class="s">${o ? `Ability: <b>${ab.name}</b><br>Bound ${o.captures}× · ${o.credits} duplicate ${o.credits === 1 ? 'credit' : 'credits'}<br>Ascension: <b>${cfg.ascension.ranks[c.rank]}</b>${c.maxed ? '' : c.short ? ` · ${c.short} more for the next rank` : ' · <span class="lvl">ready to Ascend</span>'}</div>${masteryBar(fid)}<button class="btn alt sm" data-det="${fid}" style="margin-top:8px">Manage</button>` : 'Seen in the wilds. Not bound yet.</div>'}</div></div>`;
-  }).join('');
-}
-
 // Shared small 3D preview for binding and reveal screens.
 const preview = { renderer: null, scene: null, cam: null, model: null, anim: null };
-function showPreview(container, familiarId, color) {
+function showPreview(container, familiarId, color, mood = 'idle') {
   if (!preview.renderer) {
     const c = document.createElement('canvas'); c.id = 'bindPrev';
     preview.renderer = new THREE.WebGLRenderer({ canvas: c, antialias: true, alpha: true });
@@ -846,11 +1114,16 @@ function showPreview(container, familiarId, color) {
   const g = instance(f.model) || new THREE.Mesh(new THREE.IcosahedronGeometry(0.6), new THREE.MeshLambertMaterial({ color }));
   const box = new THREE.Box3().setFromObject(g), h = Math.max(0.5, box.max.y - box.min.y);
   preview.cam.position.set(0, h * 0.6, h * 2.05); preview.cam.lookAt(0, h * 0.5, 0);
-  preview.model = g; preview.anim = g.userData && g.userData.anim; preview.scene.add(g);
+  g.userData.s0 = 1; g.userData.baseY = 0;
+  preview.model = g; preview.modelKey = f.model; preview.t = 0; preview.anim = g.userData && g.userData.anim; preview.scene.add(g);
+  // Rigged creatures hold a stance: a wary crouch while you bind them, an easy idle once they're yours.
+  if (preview.anim) preview.anim.setLoco(mood === 'menace' ? { idle: 0.25, menace: 0.75 } : { idle: 0.6, stance: 0.4 });
 }
 function updatePreview(dt) {
   if (!preview.model || ($('bind').hidden && $('reveal').hidden)) return;
-  preview.model.rotation.y += dt * (settings.reducedMotion ? 0.2 : 0.6);
+  preview.t += dt;
+  preview.model.rotation.y = Math.sin(preview.t * 0.45) * (settings.reducedMotion ? 0.15 : 0.6); // turns to look around, stays facing you
+  Stage.creatureIdle(preview.model, preview.modelKey, preview.t);
   if (preview.anim) preview.anim.update(dt);
   preview.renderer.render(preview.scene, preview.cam);
 }
@@ -886,7 +1159,7 @@ function openBinding(encId, from = 'explore') {
   $('bindMsg').textContent = `Tap (or press Space) when the light is inside the glowing arc. ${cfg.capture.hitsPerStage} hits per stage, ${cfg.capture.timeLimitSec} seconds. Better timing raises your chance. ${e.attemptsLeft} ${e.attemptsLeft === 1 ? 'try' : 'tries'} left.`;
   $('bindGo').hidden = false; $('bindGo').textContent = 'Begin binding'; $('bindLeave').textContent = 'Leave';
   $('menu').hidden = true; $('bind').hidden = false; paused = true;
-  showPreview($('bindStage'), e.familiarId, TYPE_HEX[f.type]);
+  showPreview($('bindStage'), e.familiarId, TYPE_HEX[f.type], 'menace');
   drawRing();
 }
 function startStage(stage) {
@@ -953,7 +1226,7 @@ function drawRing() {
     const a = rad(bind.angle);
     x.fillStyle = '#fff'; x.shadowColor = '#fff'; x.shadowBlur = 20;
     x.beginPath(); x.arc(c + Math.cos(a) * R, c + Math.sin(a) * R, 17, 0, Math.PI * 2); x.fill(); x.shadowBlur = 0;
-    x.fillStyle = '#fff'; x.font = '800 30px Inter'; x.textAlign = 'center'; x.fillText(`${Math.ceil(bind.timeLeft)}s`, c, 34);
+    x.fillStyle = '#fff'; x.font = '700 32px "Alegreya Sans"'; x.textAlign = 'center'; x.fillText(`${Math.ceil(bind.timeLeft)}s`, c, 34);
   }
   if (bind.flash && !settings.reducedMotion) { x.strokeStyle = bind.flash > 0 ? '#ffffffaa' : '#ff4d4daa'; x.lineWidth = 8; x.beginPath(); x.arc(c, c, R + 22, 0, Math.PI * 2); x.stroke(); }
 }
@@ -1024,7 +1297,10 @@ function frame() {
     const f = vis.fx[i]; f.t += dt; const k = Math.min(1, f.t / f.life); f.update(f, k);
     if (k >= 1) { if (f.mesh) { fxGroup.remove(f.mesh); scene.remove(f.mesh); } if (f.el) f.el.remove(); vis.fx.splice(i, 1); }
   }
-  renderer.render(scene, cam);
+  if (campOpen() && $('world').hidden) {
+    const lay = { sheet: sheetFraction(), panel: innerWidth >= 900 && innerWidth > innerHeight ? 440 : 0 };
+    if (campTab === 'home') { Stage.renderHome(renderer, dt, lay); updateHomeLabels(); } else Stage.renderHub(renderer, dt, t, lay);
+  } else renderer.render(scene, cam);
   updateBinding(dt); updatePreview(dt); tickWorld(dt);
 }
 
@@ -1043,27 +1319,31 @@ function debugInfo() {
   el.textContent = lines.join('\n');
 }
 // Dev hook for automated checks in the browser console.
-window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; }, vis };
+window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; }, vis, Stage, get home() { return home; }, get prof() { return prof; } };
 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=8')).json();
+    cfg = await (await fetch('data/config.json?v=9')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
     if (!Object.keys(col.owned).length) Col.grantStarters(cfg, col, Date.now());
     saveCol();
     prof = P.loadProfile(cfg, store.get('tc.profile', null));
+    home = S.loadHome(cfg, store.get('tc.home', null));
+    while (prof.presets.length < S.facilityEffect(cfg, home, 'chamber').presets) prof.presets.push(null);
+    Stage.initStage({ instance, assets, loadModel, decal, cfg: () => cfg, reducedMotion: () => settings.reducedMotion });
+    Stage.buildHub(); Stage.buildHome(cfg);
     if (!loadout || loadout.length !== 3 || loadout.some((f) => !col.owned[f])) loadout = [...cfg.starters];
     renderLegend();
     setInterval(tickWilds, 1000);
     initWorld({ cfg, col: () => col, saveCol, rarityCfg, icon, css, toast, openBinding,
       pause: (p) => { paused = p; }, openMenu: (tab) => toggleMenu(true, tab) });
     $('openMap').onclick = () => { $('menu').hidden = true; openWorld(); };
-    buildMenu();
+    await Stage.setHubLoadout(loadout, weaponModel());
     $('loading').remove();
-    toggleMenu(true);
+    toggleMenu(true, 'play');
     camTarget.set(0, 0, 4); cam.position.copy(camTarget).add(CAM_OFF); cam.lookAt(camTarget);
     frame();
   } catch (err) {

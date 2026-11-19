@@ -22,9 +22,9 @@ function rngFrom(seed) {
 }
 
 export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}) {
-  const P = cfg.player;
+  const P = { ...cfg.player, ...(loadout.player || {}) }; // gear-adjusted stats (M5) arrive precomputed and capped
   const rng = rngFrom(seed);
-  const weapon = cfg.weapons[loadout.weaponId];
+  const weapon = loadout.weapon || cfg.weapons[loadout.weaponId];
   const slots = loadout.familiarIds.map((fid, i) => {
     const fam = cfg.familiars[fid];
     if (!fam) throw new Error(`Unknown familiar ${fid}`);
@@ -44,7 +44,7 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
     t: 0, wave: -1, waveDelay: 1.0, over: false, nextId: 1,
     player: {
       id: 0, team: 'player', x: 0, z: 6, r: P.radius,
-      hp: P.health, maxHp: P.health, mana: P.mana, stamina: P.stamina,
+      hp: P.health, maxHp: P.health, mana: P.mana, maxMana: P.mana, stamina: P.stamina, maxStamina: P.stamina,
       shield: 0, shieldT: 0, stoneT: 0, facing: { x: 0, z: -1 },
       dodgeT: 0, dodgeDir: null, invulnT: 0, dodgeCd: 0, dash: null,
       fireCd: 0, cds: [0, 0, 0], charging: [null, null, null], held: [false, false, false], dodgeHeld: false,
@@ -237,7 +237,12 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
     // Basic weapon: hold to fire along the aim vector.
     if (input.fire && p.fireCd <= 0 && !p.dash) {
       p.fireCd = weapon.fireInterval;
-      spawnProjectile('player', p.x + aim.x * 0.6, p.z + aim.z * 0.6, aim, weapon, 'weapon');
+      const n = weapon.count || 1, sp = ((weapon.spreadDeg || 0) * Math.PI) / 180;
+      for (let k = 0; k < n; k++) { // a fixed fan around the aim vector, never toward a target
+        const a = n === 1 ? 0 : -sp + (2 * sp * k) / (n - 1), c = Math.cos(a), s = Math.sin(a);
+        const dir = { x: aim.x * c - aim.z * s, z: aim.x * s + aim.z * c };
+        spawnProjectile('player', p.x + dir.x * 0.6, p.z + dir.z * 0.6, dir, weapon, 'weapon');
+      }
       emit({ type: 'fire', x: p.x, z: p.z, dir: aim });
     }
 

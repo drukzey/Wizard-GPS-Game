@@ -25,7 +25,7 @@ test('mastery levels use the GDD thresholds (1-10)', () => {
 
 test('no rewards for a run with no kills, and no mastery for familiars that did nothing', () => {
   const zero = P.battleRewards(cfg, { kills: 0, wavesCleared: 3, slots: [{ familiarId: 'fam_medusa', damage: 500, absorbed: 0, hits: 2 }] });
-  assert.deepEqual(zero, { xp: 0, gold: 0, essence: 0, mastery: {} });
+  assert.deepEqual(zero, { xp: 0, gold: 0, essence: 0, mastery: {}, materials: {} });
   const r = P.battleRewards(cfg, { kills: 5, wavesCleared: 2, slots: [
     { familiarId: 'fam_spirit_demon', damage: 800, absorbed: 0, hits: 4 },
     { familiarId: 'fam_fort_golem', damage: 0, absorbed: 0, hits: 0 }, // shield never absorbed anything

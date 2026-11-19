@@ -77,7 +77,53 @@ R = f'{UP}/POLYGON_Fantasy_Rivals_SourceFiles_v4/FBX/Characters'
 MODELS_M4 = {'mech_golem': f'{R}/SK_BR_Character_MechanicalGolem_01.fbx', 'ancient_warrior': f'{R}/SK_Character_Ancient_Warrior_01.fbx',
              'evil_god': f'{R}/SK_Character_EvilGod_01.fbx'}
 
-if __name__ == '__main__' and sys.argv[1:] == ['m4']:  # M4 enemies only: python3 -I build.py m4
+K = f'{UP}/POLYGON_Fantasy_Kingdom_SourceFiles_v6/FBX'
+_B = {'hut': 'Bld_Preset_Hut_01_Optimized', 'house_04': 'Bld_Preset_House_04_Optimized', 'house_04_glass': 'Bld_Preset_House_04_Glass_Optimized',
+      'house_08': 'Bld_Preset_House_08_Optimized', 'house_08_glass': 'Bld_Preset_House_08_Glass_Optimized',
+      'house_05': 'Bld_Preset_House_05_Optimized', 'house_05_glass': 'Bld_Preset_House_05_Glass_Optimized',
+      'workbench': 'Prop_Workbench_Forge_01_Preset', 'blacksmith': 'Bld_Preset_Blacksmith_01_Optimized', 'blacksmith_glass': 'Bld_Preset_Blacksmith_01_Glass_Optimized',
+      'house_03': 'Bld_Preset_House_03_Optimized', 'house_03_glass': 'Bld_Preset_House_03_Glass_Optimized',
+      'tower': 'Bld_Preset_Tower_01_Optimized', 'tower_glass': 'Bld_Preset_Tower_01_Glass',
+      'tree': 'Env_Tree_Round_01', 'lamp': 'Prop_Street_Lamp_01', 'fountain': 'Env_Fountain_Statue_01', 'banner': 'Prop_Banner_01',
+      'flowers': 'Env_Bush_Flowers_01', 'well': 'Prop_Well_01', 'crystal': 'Item_Crystal_01', 'statue': 'Prop_Statue_Hero_01'}
+MODELS_SANCTUARY = {k: f'{K}/SM_{v}.fbx' for k, v in _B.items()}
+MODELS_GEAR = {f'staff_{i:02d}': f'{K}/SM_Wep_Staff_{i:02d}.fbx' for i in range(1, 11)}
+M5 = f'{UP}/_tomecraft_preview/ui_m5'
+UI_M5 = {  # name: (file in ui_m5, max size). Frames are used as CSS border-images, so they keep their full size.
+    'f_panel': ('SPR_DarkFantasyMenus_Frame_Box_Large_05.png', 512), 'f_wide': ('SPR_DarkFantasyMenus_Frame_Box_Large_07.png', 512),
+    'f_card': ('SPR_DarkFantasyMenus_Frame_Box_Medium_02.png', 256), 'f_card2': ('SPR_DarkFantasyMenus_Frame_Box_Medium_03.png', 256),
+    'f_btn': ('SPR_DarkFantasyMenus_Frame_Bar_Large_16.png', 512), 'f_tab': ('SPR_DarkFantasyMenus_Frame_Bar_Large_11.png', 512),
+    'f_btn2': ('SPR_DarkFantasyMenus_Frame_Bar_Medium_07.png', 512), 'f_ring': ('SPR_DarkFantasyMenus_Frame_Ring_07.png', 256),
+    'f_diamond': ('SPR_DarkFantasyMenus_Frame_Diamond_04.png', 256), 'f_bar': ('SPR_DarkFantasyMenus_Bar_11.png', 512),
+    'f_brackets': ('SPR_DarkFantasyMenus_Frame_Brackets_02.png', 256), 'f_crest': ('SPR_DarkFantasyMenus_Greeble_Curlicue_04.png', 512),
+    'f_line': ('SPR_DarkFantasyMenus_Line_Horizontal_02.png', 512),
+    'n_play': ('SPR_DarkFantasyMenus_Icon_Swords_01.png', 128), 'n_journal': ('SPR_DarkFantasyMenus_Icon_Book_02.png', 128),
+    'n_wizard': ('SPR_DarkFantasyMenus_Icon_Helmet_01.png', 128), 'n_home': ('SPR_DarkFantasyMenus_Icon_Exit_02.png', 128),
+    'n_map': ('SPR_DarkFantasyMenus_Icon_Flag_01.png', 128), 'n_settings': ('SPR_DarkFantasyMenus_Icon_Settings_01.png', 96),
+    'n_scroll': ('SPR_DarkFantasyMenus_Icon_Scroll_02.png', 128), 'n_medal': ('SPR_DarkFantasyMenus_Icon_Medal_01.png', 96),
+    'c_gold': ('SPR_DarkFantasyMenus_Currency_Coin_01.png', 96), 'c_essence': ('SPR_DarkFantasyMenus_Currency_Gem_03.png', 96),
+    'm_rune': ('SPR_DarkFantasyMenus_Currency_Rune_01.png', 96), 'm_stone': ('SPR_DarkFantasyMenus_Currency_Gem_01.png', 96),
+    'm_ore': ('ICON_DarkFantasy_Inventory_Minerals_01_Clean.png', 96), 'chest': ('SPR_DarkFantasyMenus_Chest_02.png', 256),
+    's_weapon': ('ICON_DarkFantasy_Inventory_Staves_01_Clean.png', 96), 's_robe': ('ICON_DarkFantasy_Inventory_Armor_01_Clean.png', 96),
+    's_boots': ('ICON_DarkFantasy_Inventory_Boot_01_Clean.png', 96), 's_amulet': ('ICON_DarkFantasy_Inventory_Necklace_02_Clean.png', 96),
+    's_ring': ('ICON_DarkFantasy_Inventory_Ring_02_Clean.png', 96), 'n_craft': ('ICON_DarkFantasy_Inventory_Crafting_01_Clean.png', 96),
+    'n_research': ('ICON_DarkFantasy_Inventory_Spellbooks_01_Clean.png', 96), 'n_forge': ('ICON_DarkFantasy_Map_Blacksmith_01_Clean.png', 96),
+    'n_dwelling': ('ICON_DarkFantasy_Map_Home_01_Clean.png', 96), 'n_chamber': ('ICON_DarkFantasy_Map_Magic_01_Clean.png', 96),
+    'n_library': ('ICON_DarkFantasy_Map_Quest_01_Clean.png', 96), 'n_lock': ('ICON_DarkFantasy_Map_Lock_01_Clean.png', 96),
+}
+
+if __name__ == '__main__' and sys.argv[1:] == ['m5']:  # M5 only: python3 -I build.py m5
+    os.makedirs(os.path.join(OUT, 'sanct'), exist_ok=True)  # one file per model so the Sanctuary loads only what it shows
+    print('sanct/*', sum(pack({k: v}, f'sanct/{k}.js') for k, v in MODELS_SANCTUARY.items()))
+    print('gear.js', pack(MODELS_GEAR, 'gear.js'))
+    A2 = f'{UP}/Anim2/Animations/Polygon/Masculine/Posture/Stances'
+    print('anims_m5.js', pack({'stance': f'{A2}/A_POLY_IDL_Posture_Dramatic_Loop_Masc.fbx', 'menace': f'{A2}/A_POLY_IDL_Posture_Aggressive_Loop_Masc.fbx'}, 'anims_m5.js'))
+    ui = os.path.join(HERE, 'ui')
+    for k, (f, m) in UI_M5.items():
+        im = Image.open(os.path.join(M5, f)).convert('RGBA'); im.thumbnail((m, m), Image.LANCZOS)
+        im.save(os.path.join(ui, f'{k}.png'), optimize=True)
+    print('ui m5', len(UI_M5))
+elif __name__ == '__main__' and sys.argv[1:] == ['m4']:  # M4 enemies only: python3 -I build.py m4
     print('models_m4.js', pack(MODELS_M4, 'models_m4.js'))
 elif __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
