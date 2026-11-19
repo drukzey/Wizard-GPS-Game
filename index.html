@@ -303,13 +303,13 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .tomeBtn:active,.avatarBtn:active,.nearbyBtn:active{transform:translateX(var(--tx,0)) scale(.95)}.tomeBtn{--tx:-50%}
 .nearbyBtn{position:absolute;right:14px;bottom:calc(22px + env(safe-area-inset-bottom));min-width:118px;height:72px;padding:6px 10px;border:14px solid transparent;border-image:var(--u-f_card2) 60 / 14px stretch;background:#121718f0 padding-box;cursor:pointer;color:var(--bone);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 .nearFaces{display:flex;gap:2px}.nearFaces img{width:30px;height:30px;border-radius:50%;object-fit:cover;background:#0b0f0e;box-shadow:0 0 0 1px #3b4245}
-.nearFaces img.unknown{filter:brightness(0) drop-shadow(0 0 1px #9aa39e)}
+.nearFaces img.unknown{background:none;filter:brightness(0) invert(.32)}
 .nearbyBtn small{font:600 12px var(--body);color:var(--ash)}
 .nearbyPanel{position:absolute;right:10px;bottom:calc(104px + env(safe-area-inset-bottom));width:min(380px,calc(100vw - 20px));max-height:62vh;overflow:auto;touch-action:pan-y}
 .npHead{display:flex;align-items:center;justify-content:space-between;margin:2px 0 6px}
 .nearRow{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:8px;background:#0f1314;border:1px solid #2c3335;border-left:3px solid var(--rc);color:var(--bone);cursor:pointer;margin-bottom:6px;font:inherit}
 .nearRow img{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#0b0f0e}
-.nearRow img.unknown{filter:brightness(0) drop-shadow(0 0 1px #9aa39e)}
+.nearRow img.unknown{filter:brightness(0) invert(.32);background:none}
 .nearRow b{font:700 17px var(--display);display:block}.nearRow .grow{flex:1;min-width:0}
 .nearRow .tag{margin-left:auto}
 .hit{width:70px;height:100px;border:0;background:none;padding:0;cursor:pointer;position:relative}
@@ -361,7 +361,7 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 @media (max-width:600px){.encBottom{padding:0 16px 0 90px}}
 .famIco.pic{width:54px;height:54px;position:relative;background:radial-gradient(circle at 50% 35%,#3a4a46,#0d1112);box-shadow:0 0 0 2px #000a,0 0 0 3px var(--c)}
 .famIco.pic img{width:100%;height:100%;border-radius:50%;object-fit:cover}
-.famIco.unknown{box-shadow:0 0 0 2px #000a,0 0 0 3px #444}.famIco.unknown img{filter:brightness(0) drop-shadow(0 0 1px #9aa39e)}
+.famIco.unknown{box-shadow:0 0 0 2px #000a,0 0 0 3px #444}.famIco.unknown img{filter:brightness(0) invert(.32)}.famIco.unknown{background:#0b0f0e}
 .abBadge{position:absolute;right:-5px;bottom:-5px;width:24px;height:24px;border-radius:50%;background:#0b0f0e;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px var(--c);font-style:normal}
 .abBadge .ico{width:15px;height:15px}
 .slotR img.pt{width:64px;height:64px;border-radius:50%;object-fit:cover;background:radial-gradient(circle at 50% 35%,#3a4a46,#0d1112)}
@@ -540,6 +540,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=16"></script>
+<script type="module" src="game.js?v=17"></script>
 </body>
 </html>

@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=16';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=16';
-import * as Col from './collection.js?v=16';
-import * as P from './progression.js?v=16';
-import * as S from './sanctuary.js?v=16';
-import * as Stage from './stage.js?v=16';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=16';
-import * as World from './world.js?v=16';
+import { createSim } from './sim.js?v=17';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=17';
+import * as Col from './collection.js?v=17';
+import * as P from './progression.js?v=17';
+import * as S from './sanctuary.js?v=17';
+import * as Stage from './stage.js?v=17';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=17';
+import * as World from './world.js?v=17';
 
 const $ = (id) => document.getElementById(id);
-const VER = 16; // cache-busting version, kept in step by stamp.py
+const VER = 17; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -120,7 +120,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=16`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=17`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -129,7 +129,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=16')).default, ...(await import('./pub/anims_m5.js?v=16')).default };
+    const packed = { ...(await import('./pub/anims.js?v=17')).default, ...(await import('./pub/anims_m5.js?v=17')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -138,7 +138,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=16')).default, ...(await import('./pub/models_m4.js?v=16')).default };
+  const models = { ...(await import('./pub/models.js?v=17')).default, ...(await import('./pub/models_m4.js?v=17')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -160,7 +160,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=16')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=17')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
@@ -1212,7 +1212,7 @@ function showPreview(container, familiarId, color, mood = 'idle') {
   const f = cfg.familiars[familiarId];
   const g = instance(f.model) || new THREE.Mesh(new THREE.IcosahedronGeometry(0.6), new THREE.MeshLambertMaterial({ color }));
   const box = new THREE.Box3().setFromObject(g), h = Math.max(0.5, box.max.y - box.min.y);
-  if (full) { const d = h * 2.6 / Math.min(1, preview.cam.aspect * 1.4); preview.cam.position.set(0, h * 0.45, d); preview.cam.lookAt(0, h * 0.62, 0); preview.shade.scale.setScalar(Math.max(0.6, h * 0.35)); }
+  if (full) { const d = h * 3.7 / Math.min(1, preview.cam.aspect * 1.3); preview.cam.position.set(0, h * 0.42, d); preview.cam.lookAt(0, h * 0.5, 0); preview.shade.scale.setScalar(Math.max(0.5, h * 0.28)); }
   else { preview.cam.position.set(0, h * 0.6, h * 2.05); preview.cam.lookAt(0, h * 0.5, 0); }
   g.userData.s0 = 1; g.userData.baseY = 0;
   preview.model = g; preview.modelKey = f.model; preview.t = 0; preview.anim = g.userData && g.userData.anim; preview.scene.add(g);
@@ -1424,7 +1424,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=16')).json();
+    cfg = await (await fetch('data/config.json?v=17')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
