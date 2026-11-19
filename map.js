@@ -1,13 +1,13 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=14';
-import * as Col from './collection.js?v=14';
+import * as World from './world.js?v=15';
+import * as Col from './collection.js?v=15';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
-const ZOOM = 17.6, PITCH = 58;
+const ZOOM = 18.9, PITCH = 60;
 
 const $ = (id) => document.getElementById(id);
 let H; // hooks from game.js
@@ -55,7 +55,7 @@ export function returnToWorld() { $('world').hidden = false; st.open = true; sca
 function createMap() {
   const start = H.cfg.world.demoStart;
   st.map = new maplibregl.Map({ container: 'worldMap', style: STYLE, center: [start.lon, start.lat], zoom: ZOOM, pitch: PITCH, bearing: -20,
-    attributionControl: { compact: true }, maxPitch: 70, minZoom: 15, dragRotate: true, touchPitch: true });
+    attributionControl: { compact: true }, maxPitch: 70, minZoom: 16, dragRotate: true, touchPitch: true });
   st.map.on('load', () => { fantasyStyle(st.map); addOverlays(); st.map.addLayer(layer3d); st.ready = true; scan(true); });
   st.map.on('click', (e) => { if (st.demo) st.demoTarget = { lat: e.lngLat.lat, lon: e.lngLat.lng }; });
   st.map.on('dragstart', () => { st.follow = false; });
@@ -77,7 +77,7 @@ function fantasyStyle(map) {
     } else if (l.type === 'fill-extrusion') { set(id, 'fill-extrusion-color', '#4a4f55'); set(id, 'fill-extrusion-opacity', 0.92); }
     else if (l.type === 'line') {
       if (/water|river|stream|canal/.test(id)) set(id, 'line-color', '#1f5f6e');
-      else if (/path|footway|track|pedestrian|cycle|steps/.test(id)) { set(id, 'line-color', '#d6b26a'); set(id, 'line-opacity', 0.75); }
+      else if (/path|footway|track|pedestrian|cycle|steps/.test(id)) { set(id, 'line-color', '#c9a865'); set(id, 'line-opacity', 0.55); set(id, 'line-dasharray', [1, 0]); }
       else if (/road|street|highway|motorway|trunk|primary|secondary|tertiary|minor|service|bridge|tunnel/.test(id)) set(id, 'line-color', /casing/.test(id) ? '#1a201c' : '#8a7652');
       else if (/boundary|admin/.test(id)) hide(id);
       else if (/rail/.test(id)) set(id, 'line-color', '#55504a');
@@ -103,7 +103,7 @@ function addOverlays() {
 
 // ---------- the 3D layer: wizard, familiars and portals standing on the map ----------
 const g3 = { scene: null, cam: null, renderer: null, origin: null, wizard: null, things: new Map(), clock: new THREE.Clock(), merc: null };
-const SCALE = 3.4; // creatures are drawn larger than life so they read at street zoom, as map games do
+const SCALE = 5.5; // creatures are drawn larger than life so they read at street zoom, as map games do
 const layer3d = {
   id: 'tomecraft-3d', type: 'custom', renderingMode: '3d',
   onAdd(map, gl) {

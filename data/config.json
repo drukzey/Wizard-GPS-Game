@@ -610,8 +610,8 @@
     "maxSpeedMps": 7,
     "viewRadiusM": 450,
     "demoStart": {
-      "lat": 51.5027,
-      "lon": -0.1337
+      "lat": 51.50435,
+      "lon": -0.14355
     },
     "demoWalkMps": 6,
     "riftCellM": 450,

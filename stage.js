@@ -90,7 +90,7 @@ export function renderHub(renderer, dt, t, layout) {
   c.fov = portrait ? 50 : 32;
   // pull back so the whole platform fits in the part of the screen the sheet leaves free
   const free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
-  const k = Math.min(2.4, 1 / Math.max(0.35, free));
+  const k = Math.min(2.8, 1.15 / Math.max(0.35, free));
   c.position.set(0, (portrait ? 2.6 : 2.2) * (0.6 + 0.4 * k), (portrait ? 10.5 : 8.2) * k); c.lookAt(0, 1.15, -0.6);
   c.clearViewOffset();
   if (layout.sheet) {

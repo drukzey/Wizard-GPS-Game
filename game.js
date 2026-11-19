@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=14';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=14';
-import * as Col from './collection.js?v=14';
-import * as P from './progression.js?v=14';
-import * as S from './sanctuary.js?v=14';
-import * as Stage from './stage.js?v=14';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=14';
-import * as World from './world.js?v=14';
+import { createSim } from './sim.js?v=15';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=15';
+import * as Col from './collection.js?v=15';
+import * as P from './progression.js?v=15';
+import * as S from './sanctuary.js?v=15';
+import * as Stage from './stage.js?v=15';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=15';
+import * as World from './world.js?v=15';
 
 const $ = (id) => document.getElementById(id);
-const VER = 14; // cache-busting version, kept in step by stamp.py
+const VER = 15; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -120,7 +120,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=14`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=15`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -129,7 +129,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=14')).default, ...(await import('./pub/anims_m5.js?v=14')).default };
+    const packed = { ...(await import('./pub/anims.js?v=15')).default, ...(await import('./pub/anims_m5.js?v=15')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -138,7 +138,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=14')).default, ...(await import('./pub/models_m4.js?v=14')).default };
+  const models = { ...(await import('./pub/models.js?v=15')).default, ...(await import('./pub/models_m4.js?v=15')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -160,7 +160,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=14')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=15')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
@@ -667,6 +667,7 @@ const mkBtn = (text, fn, cls = 'btn sm') => { const b = document.createElement('
 function saveProf() { store.set('tc.profile', prof); renderWallet(); }
 function saveHome() { store.set('tc.home', home); }
 function renderPurse(id) { $(id).innerHTML = ['gold', 'essence'].map((k) => `<span class="coin" title="${matName(k)}">${sprite(MAT_ICON[k])}${haveOf(k)}</span>`).join(''); }
+function renderTomeTiles() { const lead = loadout[0]; const t = document.querySelector('.tile[data-go=familiars] .sprite'); if (lead && portraits[lead] && t) t.outerHTML = `<img class="tileFace" src="${portraits[lead]}" alt="">`; else { const im = document.querySelector('.tile[data-go=familiars] .tileFace'); if (im && portraits[lead]) im.src = portraits[lead]; } }
 function renderAvatar() {
   const L = P.levelInfo(cfg, prof.xp);
   $('lvT').textContent = L.level; $('xpRing').style.setProperty('--xp', `${L.need ? Math.round((100 * L.into) / L.need) : 100}%`);
@@ -722,7 +723,7 @@ function showTab(tab) {
 $('pageClose').onclick = () => toggleMenu(false);
 $('menuBtn').onclick = () => toggleMenu(true, 'battle');
 $('setClose').onclick = () => { $('settingsOv').hidden = true; };
-$('tomeBtn').onclick = () => { $('tomeMenu').hidden = false; $('nearbyPanel').hidden = true; renderPurse('tmPurse'); };
+$('tomeBtn').onclick = () => { $('tomeMenu').hidden = false; $('nearbyPanel').hidden = true; renderPurse('tmPurse'); renderTomeTiles(); };
 $('tomeClose').onclick = () => { $('tomeMenu').hidden = true; };
 for (const t of document.querySelectorAll('#tomeMenu .tile')) t.onclick = () => {
   if (t.dataset.go === 'settings') { $('settingsOv').hidden = false; return; }
@@ -1423,7 +1424,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=14')).json();
+    cfg = await (await fetch('data/config.json?v=15')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
