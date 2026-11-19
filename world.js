@@ -1,7 +1,7 @@
 // Tomecraft GPS overworld rules (M6 alpha): map cells, deterministic spawns, range and speed checks.
 // Pure logic. Spawns come from a hash of (cell, time window), so everyone in the same place sees the same
 // familiars without a server, and nothing about the player's location leaves the device.
-import { rollSpecies, rngFrom } from './collection.js?v=15';
+import { rollSpecies, rngFrom } from './collection.js?v=16';
 
 const R_EARTH = 6371000;
 export function distanceM(a, b) {

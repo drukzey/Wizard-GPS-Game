@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=15';
-import * as Col from './collection.js?v=15';
+import * as World from './world.js?v=16';
+import * as Col from './collection.js?v=16';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -14,6 +14,7 @@ let H; // hooks from game.js
 const st = { map: null, pos: null, acc: 0, prevFix: null, tooFast: false, watch: null, demo: false, demoTarget: null, gotFix: false,
   markers: new Map(), rifts: new Map(), spawns: [], sites: [], lastScan: 0, ready: false, open: false, safetyOk: false, follow: true, heading: 0, moving: 0 };
 
+window.__map = { st, g3: null };
 export const mapSupported = () => !/claudeusercontent\.com$|claude\.ai$/.test(location.hostname);
 export const worldOpen = () => st.open;
 export const nearbyState = () => ({ spawns: st.spawns, sites: st.sites, pos: st.pos, acc: st.acc });
@@ -102,7 +103,7 @@ function addOverlays() {
 }
 
 // ---------- the 3D layer: wizard, familiars and portals standing on the map ----------
-const g3 = { scene: null, cam: null, renderer: null, origin: null, wizard: null, things: new Map(), clock: new THREE.Clock(), merc: null };
+const g3 = window.__map.g3 = { scene: null, cam: null, renderer: null, origin: null, wizard: null, things: new Map(), clock: new THREE.Clock(), merc: null };
 const SCALE = 5.5; // creatures are drawn larger than life so they read at street zoom, as map games do
 const layer3d = {
   id: 'tomecraft-3d', type: 'custom', renderingMode: '3d',
