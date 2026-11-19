@@ -136,6 +136,10 @@ if __name__ == '__main__' and sys.argv[1:] == ['m6']:  # map scenery, island and
     for k, (p, m) in UI_M6.items():
         im = Image.open(p).convert('RGBA'); im.thumbnail((m, m), Image.LANCZOS); im.save(os.path.join(ui, f'{k}.png'), optimize=True)
     print('ui m6', len(UI_M6))
+elif __name__ == '__main__' and sys.argv[1:] == ['flora']:  # map groves: python3 -I build.py flora
+    F = {'tree2': 'SM_Env_Tree_Round_02', 'tree3': 'SM_Env_Tree_Round_03', 'thin': 'SM_Env_Tree_Thin_01', 'oak': 'SM_Env_Tree_Large_01',
+         'pines2': 'SM_Env_Tree_Pine_Cluster_02', 'shrubs': 'SM_Env_Bush_Cluster_01', 'fern': 'SM_Env_Fern_01'}
+    print('sanct/* flora', sum(pack({k: f'{K}/{v}.fbx'}, f'sanct/{k}.js') for k, v in F.items()))
 elif __name__ == '__main__' and sys.argv[1:] == ['anims']:  # custom Blender clips: python3 -I build.py anims (after blender/make_anims.py)
     B = f'{UP}/_tomecraft_blender/out'
     print('anims_custom.js', pack({k: f'{B}/{k}.fbx' for k in ['staffIdle', 'staffWalk', 'staffCast', 'channel', 'idleRT']}, 'anims_custom.js'))

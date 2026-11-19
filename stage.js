@@ -124,7 +124,7 @@ export function setHubFocus(f) { hub.focus = f; for (const g of hub.team) g.visi
 export function spinHub(dx) { hub.yawV = dx * 3; hub.yaw += dx; }
 
 // ---------- Sanctuary plot ----------
-export const home = { scene: null, cam: null, root: null, facilities: {}, decor: [], ghost: null, yaw: Math.PI / 4, pitch: 0.95, dist: 42, tiles: null, target: new THREE.Vector3(), built: '' };
+export const home = { scene: null, cam: null, root: null, facilities: {}, decor: [], ghost: null, yaw: Math.PI / 4, pitch: 0.82, dist: 60, tiles: null, target: new THREE.Vector3(), built: '' };
 
 export function buildHome(cfg) {
   const s = home.scene = new THREE.Scene();
@@ -261,7 +261,7 @@ export function renderHome(renderer, dt, layout) {
 }
 export function orbitHome(dx, dy, dz) {
   home.yaw -= dx * 0.008; home.pitch = Math.max(0.35, Math.min(1.35, home.pitch + dy * 0.005));
-  home.dist = Math.max(16, Math.min(70, home.dist * (1 + dz)));
+  home.dist = Math.max(18, Math.min(95, home.dist * (1 + dz)));
 }
 /** Screen position of a facility's roof, for its floating label. */
 export function labelPos(id) {
