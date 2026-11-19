@@ -1,0 +1,5 @@
+# Raw Synty source files never go in this repo (licence): only packed builds in pub/
+assets/*.fbx
+*.fbx
+node_modules/
+.DS_Store

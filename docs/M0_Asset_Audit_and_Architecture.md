@@ -1,0 +1,102 @@
+# Tomecraft: M0 Asset Audit and Architecture
+
+**Status:** M0 complete (draft for owner review). **Date:** 2026-11-19
+**Source of truth:** Wizard World Official GDD v1.0
+
+## 1. What's in the asset folder
+
+Source: `~/Desktop/Assets` (Synty SourceFiles: FBX models and PNG/TGA textures). About 4,000 FBX files across 14 packs.
+
+| Pack | What it gives the game |
+|---|---|
+| POLYGON Fantasy Rivals | **Main familiar and boss source.** 20 rigged creature or hero models: Spirit Demon, Red Demon, Evil God, Mystic, Medusa (+ snakes), Forest Guardian, Forest Witch, Elemental / Fort / Mechanical Golem, Troll, Big Ork, Barbarian Giant, Mutant, Pig Butcher, Slayer, Dark Elf, Dwarf, Ancient Queen, Ancient Warrior. Each has a matching weapon mesh. Small 4-variant texture atlases. |
+| POLYGON Dark Fantasy | Gargoyle, Demon (big), Dark Lord, Witch, Hunter, Plague Doctor, 5 skeleton variants. Gothic buildings, props, FX meshes. |
+| POLYGON Dungeon Realms | Demon (with separate wings), skeletons, Undead Knight, dwarves, nomads. About 1,100 dungeon, ruin, lava and hell pieces. **Arena and rift material.** |
+| POLYGON Fantasy Kingdom | **Player wizard candidates:** Mage (+ cape), Fortune Teller, Hermit, Monk. Also Fairy (+ wings), about 650 town and castle pieces. **Sanctuary building material.** |
+| POLYGON Fantasy Characters | Wizard, Sorcerer, Witch, Druid (older models). |
+| POLYGON Elven Realm | Elven characters, buildings, props, weapons. |
+| POLYGON Modular Fantasy Hero | Modular hero parts (for character customisation later). |
+| POLYGON Pirate Realm | Small unrigged pets: **Parrot, Rat, Squid**. Also docks, ships, treasure. |
+| POLYGON Goblin War Camp | Goblin characters (combined FBX), camp pieces. |
+| POLYGON Viking Realm + Generic (`SourceFiles`) | Nature, rune stones, 25 symbol meshes, shields, weapons, a bow. |
+| POLYGON Nature Biomes: Alpine Mountain | Terrain, trees, rocks. |
+| POLYGON Particle FX (`Source Files`) | FX meshes and textures for spells. |
+| INTERFACE Dark Fantasy Menus + `Source_Sprites` | Menu frames, icons, fonts, cursors, and 3D chest, coin, gem, key and rune pickups. **UI kit.** |
+
+### Constraints found
+1. **Animations (updated 2026-11-19):** Synty animation packs were added: `Anim1` Sword Combat, `Anim2` Idles, `Anim3` Base Locomotion. They target the newer Synty rig (Hips, UpperLeg_L, Shoulder_L...), while all character models use the older rig (Pelvis, Thigh_L, UpperArm_L...). The game retargets at runtime (`anim.js`): bone map, rest-direction correction, and the animation file's own skeleton as the source. Verified in browser: wizard and troll idle, walk and run upright. In use: idle, run F/B/L/R blend, walk, dodge rolls F/B/L/R, cast (sword light attack), heavy attack (troll), stab (dark elf cast), hit react, death.
+   *Original finding:* **No usable animations.** The character FBX files hold rigs and a bind pose but no walk, attack or cast clips. Synty sells animations separately. **Fallback (GDD §18 step 3):** procedural motion (bob, lean, hover, squash on hit, spin on dodge) driven by code. Characters will look stiff until an animation pack is added. *Owner decision: buy a Synty animation pack or accept procedural motion for MVP.*
+2. **Several "characters" are combined FBX files** (e.g. Goblin `Characters.fbx`, Elven `Characters.fbx`). They need splitting before use. Rivals, Kingdom and Dark Fantasy have individual files, so those are used first.
+3. **Licensing:** Synty assets may be used in a game but the raw files may not be redistributed. The prototype stays private. Check the Synty EULA before any public release.
+
+## 2. Familiar catalog (MVP, provisional)
+
+The GDD asks for 6 to 12 familiars from real assets with every type represented. These 9 are proposed, 3 per type. All names are working titles taken from the model files. Rarity is provisional and set by the content registry.
+
+| ID | Model file | Type | Base ability (mechanic) | Provisional rarity |
+|---|---|---|---|---|
+| fam_spirit_demon | Rivals `SK_Character_SpiritDemon` | Arcane | Arcane Bolt: fast aimed projectile | Common |
+| fam_mystic | Rivals `SK_Character_Mystic_01` | Arcane | Charged Blast: hold to charge, release a bigger slower bolt | Uncommon |
+| fam_fairy | Kingdom `SK_Chr_Fairy_01` + wings | Arcane | Spark Fan: 3 aimed bolts in a narrow cone | Rare |
+| fam_fort_golem | Rivals `SK_BR_Character_FortGolem_01` | Runic | Rune Shield: barrier that absorbs damage for a few seconds | Common |
+| fam_elemental_golem | Rivals `SK_BR_Character_ElementalGolem_01` | Runic | Retaliation Circle: placed ring that damages enemies inside | Uncommon |
+| fam_gargoyle | Dark Fantasy `SM_Chr_Gargoyle_01` | Runic | Stone Skin: damage reduction, slower movement | Epic |
+| fam_medusa | Rivals `SK_Character_Medusa_01` + snakes | Ancient | Serpent Dash: aimed dash that damages along its path | Common |
+| fam_parrot | Pirate `SM_Prop_Pet_Parrot_01` (unrigged) | Ancient | Gust: aimed knockback cone | Uncommon |
+| fam_squid | Pirate `SM_Prop_Pet_Squid_01` (unrigged) | Ancient | Ink Pool: placed zone that slows | Rare |
+
+**Reserved for later familiars or bosses:** Red Demon, Evil God, Forest Guardian, Mechanical Golem, Forest Witch, Dungeon Demon (with wings), Big Demon, Rat.
+
+**PvE enemy archetypes (GDD §9), same rule, existing models only:**
+- Melee pursuer: Troll, Big Ork, Barbarian Giant
+- Ranged caster: Dark Elf, Witch, Skeleton Ranger
+- Zone controller: Mechanical Golem
+- Defensive guardian: Undead Knight, Skeleton Heavy Armor
+
+**Player wizard:** Kingdom `SK_Chr_Mage_01` (+ cape). Alternatives: Fantasy Characters Wizard or Sorcerer.
+
+## 3. Engine and platform decision
+
+**Chosen: Three.js (JavaScript, WebGL) as a mobile-first web game.**
+- Loads Synty FBX and textures directly (FBXLoader), with no engine licence and nothing to install.
+- One codebase runs on iOS and Android browsers. It can be wrapped as an app later (Capacitor) if store release is wanted.
+- Combat rules live in a **pure JavaScript simulation module** with no rendering. The same module runs in the browser now and on a Node.js server later, which is how GDD §8 "server-authoritative" will be met. In M1 it runs in an automated Node test harness.
+
+**Where it runs:**
+- **M1 to M5** (combat, collection, progression, PvE, sanctuary) can be tested as a private Claude artifact page.
+- **M6 GPS overworld cannot run inside a Claude artifact.** The artifact frame blocks device location and outside map tiles. GPS testing needs the same game hosted on a normal https site (e.g. GitHub Pages or Netlify, free) with a map provider such as OpenStreetMap tiles via MapLibre. *Owner decision before M6: hosting choice.*
+- **M7 and M8 PvP** need a real game server (e.g. Node + WebSocket on a small cloud host). *Owner decision before M7.*
+
+## 4. Data schemas (implemented as JSON config)
+
+All balance numbers live in `data/config.json`, never in code. Records follow GDD §17:
+
+```text
+FamiliarDefinition { familiarId, modelAssetId, type, rarity, baseAbilityId, passiveId?, modifierIds[] }
+AbilityDefinition  { abilityId, castMode: "aimed"|"self"|"placed"|"charge", cooldown, manaCost, staminaCost,
+                     damage?, speed?, range?, radius?, duration?, shield?, dashDistance?, slowPct?, telegraph, counterplayNotes }
+WeaponDefinition   { weaponId, fireMode: "hold"|"tap"|"charge", damage, speed, range, fireInterval }
+EnemyDefinition    { enemyId, modelAssetId, archetype, health, speed, damage, attackRange, attackCooldown, telegraph }
+Loadout            { weaponId, familiarIds[3] }
+```
+
+Collection, inventory, economy and settlement records (OwnedFamiliar, Encounter, RewardTransaction, Settlement) are defined in the GDD and will be implemented in M2, M3 and M5.
+
+## 5. Milestone status
+
+| Milestone | Status |
+|---|---|
+| M0 Repository and asset audit | **Done** (this document) |
+| M1 Combat vertical slice | **Playable**: combat sim + 14 automated tests passing, Synty animations, Dark Fantasy HUD (orbs, ring ability frames, stamina bar, framed familiar cards, sigil ground FX). Remaining: on-device touch feel test, server harness |
+| M2 Collection | **Playable**: Explore tab with timed sightings and battle-wave discoveries, rarity shown before binding, timing-based binding challenge (two stages for Rare+), outcome rolled by `collection.js` with disclosed chance bounds (15% at zero skill up to the rarity's top), rarity reveal (chime from Rare, particles from Epic, banner style from Legendary; reduced-motion respected), first capture unlocks the ability, duplicates add Ascension credits, Journal with all 8 rarity tiers and their odds, saved in the browser. 11 collection tests passing (25 total). All 9 familiars now use real models (Fairy with wings, Gargoyle on the new rig, Parrot and Squid static). Remaining: server-side rolls and accounts (needs hosting) |
+| M3 to M9 | Pending |
+
+## 6. Open owner decisions
+1. ~~Animation~~ **Resolved:** Synty animation packs added and retargeted.
+2. ~~Name~~ **Decided:** Tomecraft (open to change).
+3. Hosting for the GPS alpha (M6) and the game server for PvP (M7).
+
+## 7. Build notes
+- Source: `game/` (index.html, game.js, anim.js, sim.js, collection.js, data/config.json). Tests: `node --test sim.test.mjs collection.test.mjs`. `python3 -I build.py` packs FBX as gzip+base64 JS (the artifact host does not serve .fbx) and resizes HUD sprites into `ui/`.
+- HUD sprites come from `Source_Sprites` (Synty INTERFACE Dark Fantasy HUD): Frame_Orb_01, Ring_Small_01, Frame_Bar_01, Frame_Box_Medium_01, Sigil rings, Reticle arc, stat/status/element icons.
+- Debug: open the game with `#debug` for an animation readout; Z = close camera, P = freeze.
