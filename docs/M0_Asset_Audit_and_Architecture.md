@@ -89,14 +89,17 @@ Collection, inventory, economy and settlement records (OwnedFamiliar, Encounter,
 | M0 Repository and asset audit | **Done** (this document) |
 | M1 Combat vertical slice | **Playable**: combat sim + 14 automated tests passing, Synty animations, Dark Fantasy HUD (orbs, ring ability frames, stamina bar, framed familiar cards, sigil ground FX). Remaining: on-device touch feel test, server harness |
 | M2 Collection | **Playable**: Explore tab with timed sightings and battle-wave discoveries, rarity shown before binding, timing-based binding challenge (two stages for Rare+), outcome rolled by `collection.js` with disclosed chance bounds (15% at zero skill up to the rarity's top), rarity reveal (chime from Rare, particles from Epic, banner style from Legendary; reduced-motion respected), first capture unlocks the ability, duplicates add Ascension credits, Journal with all 8 rarity tiers and their odds, saved in the browser. 11 collection tests passing (25 total). All 9 familiars now use real models (Fairy with wings, Gargoyle on the new rig, Parrot and Squid static). Remaining: server-side rolls and accounts (needs hosting) |
-| M3 to M9 | Pending |
+| M3 to M5 | Pending |
+| M6 GPS alpha (done early at owner request) | **Live**: MapLibre + OpenFreeMap (free, no key) with a dark fantasy recolour, phone GPS, deterministic familiar spawns per ~120 m map cell and 20-minute window (same for everyone, no server), 40 m reach with capped GPS-accuracy allowance, speed gate above 7 m/s, no spawns on water or main roads, safety screen, demo mode (tap to walk), location never leaves the device. 8 world tests (33 total). Verified on the live site in demo mode: map, markers, range message, walk, bind, return. Remaining: real-device walking test, rural/urban density tuning, server-side spawns and anti-spoofing |
+| M7 to M9 | Pending |
 
 ## 6. Open owner decisions
 1. ~~Animation~~ **Resolved:** Synty animation packs added and retargeted.
 2. ~~Name~~ **Decided:** Tomecraft (open to change).
-3. Hosting for the GPS alpha (M6) and the game server for PvP (M7).
+3. ~~Hosting for the GPS alpha~~ **Done:** GitHub Pages from the public repo `drukzey/Wizard-GPS-Game` → https://drukzey.github.io/Wizard-GPS-Game/ . Raw Synty FBX files are excluded (`.gitignore`); only packed builds are published. Owner to confirm the Synty licence allows a public repo.
+4. Game server for PvP (M7) and server-side spawns/accounts: still open.
 
 ## 7. Build notes
-- Source: `game/` (index.html, game.js, anim.js, sim.js, collection.js, data/config.json). Tests: `node --test sim.test.mjs collection.test.mjs`. `python3 -I build.py` packs FBX as gzip+base64 JS (the artifact host does not serve .fbx) and resizes HUD sprites into `ui/`.
+- Source of truth: GitHub repo `drukzey/Wizard-GPS-Game` (index.html, game.js, anim.js, sim.js, collection.js, world.js, map.js, data/config.json). Deploy: `python3 -I stamp.py <version>` (cache-busting), commit, push; Pages serves the repo root. Tests: `node --test sim.test.mjs collection.test.mjs`. `python3 -I build.py` packs FBX as gzip+base64 JS (the artifact host does not serve .fbx) and resizes HUD sprites into `ui/`.
 - HUD sprites come from `Source_Sprites` (Synty INTERFACE Dark Fantasy HUD): Frame_Orb_01, Ring_Small_01, Frame_Bar_01, Frame_Box_Medium_01, Sigil rings, Reticle arc, stat/status/element icons.
 - Debug: open the game with `#debug` for an animation readout; Z = close camera, P = freeze.
