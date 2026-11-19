@@ -124,18 +124,18 @@ export function setHubFocus(f) { hub.focus = f; for (const g of hub.team) g.visi
 export function spinHub(dx) { hub.yawV = dx * 3; hub.yaw += dx; }
 
 // ---------- Sanctuary plot ----------
-export const home = { scene: null, cam: null, root: null, facilities: {}, decor: [], ghost: null, yaw: Math.PI / 4, pitch: 0.82, dist: 60, tiles: null, target: new THREE.Vector3(), built: '' };
+export const home = { scene: null, cam: null, root: null, facilities: {}, decor: [], ghost: null, yaw: Math.PI / 4, pitch: 0.72, dist: 66, tiles: null, target: new THREE.Vector3(), built: '' };
 
 export function buildHome(cfg) {
   const s = home.scene = new THREE.Scene();
   s.background = new THREE.Color(0x1a2124); s.fog = new THREE.Fog(0x1a2124, 60, 160);
   const key = makeLights(s, 0xffe2b8, 0x9fd4ff);
   Object.assign(key.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 140 }); key.shadow.mapSize.set(2048, 2048); key.position.set(24, 48, 20);
-  home.cam = new THREE.PerspectiveCamera(36, 1, 0.5, 200);
+  home.cam = new THREE.PerspectiveCamera(36, 1, 0.5, 500);
   const S = cfg.sanctuary, size = S.grid * S.tile;
   home.root = new THREE.Group(); s.add(home.root);
   // A floating island above the clouds: grass top, a jagged rock underside, mist below and a dusk sky.
-  s.background = skyTexture(); s.fog = new THREE.Fog(0x2b2440, 70, 170);
+  s.background = skyTexture(); s.fog = new THREE.Fog(0x2b2440, 150, 340);
   const R = 34; // the island itself (terrain, cliffs, pond, woods, observatory) is authored in Blender: blender/build_island.py
   home.ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ visible: false })); // the buildable plot, for picking
   home.ground.rotation.x = -Math.PI / 2; s.add(home.ground);

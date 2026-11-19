@@ -129,7 +129,7 @@ def ring_scatter(names, n, r0, r1, a0=0, a1=2 * math.pi, h=(5, 8), avoid=(), sin
 
 AVOID = [(POND.x, POND.y, 7), (BIGTREE.x, BIGTREE.y, 7), (0, -R, 9)]  # pond, the great tree, the front approach
 # the great tree with fairy houses: the landmark behind the plot
-put('SM_Bld_House_Observatory_01', BIGTREE.x, BIGTREE.y, h=11, rot=math.pi, sink=0.03)  # the stargazer's observatory crowns the knoll behind the plot
+put('SM_Bld_House_Observatory_01', BIGTREE.x, BIGTREE.y, h=8, rot=math.pi, sink=0.03)  # the stargazer's observatory crowns the knoll behind the plot
 for a in (0.3, 2.2, 4.1): put('SM_Prop_Crystal_01', BIGTREE.x + 5.5 * math.cos(a), BIGTREE.y + 5.5 * math.sin(a), h=1.6 + random.random())
 # woodland ring: pines at the back, broadleaf trees at the sides, thinner toward the front so the camera sees in
 ring_scatter(['SM_Env_Tree_Pine_Cluster_01', 'SM_Env_Tree_Pine_Cluster_02', 'SM_Env_Tree_Pine_Cluster_04'], 9, R * 0.74, R * 0.9, math.radians(35), math.radians(145), h=(9, 13), avoid=AVOID)
