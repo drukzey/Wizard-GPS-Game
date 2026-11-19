@@ -139,6 +139,10 @@ table.ctl td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
 #world{position:fixed;inset:0;z-index:6;background:#18201d}
 #world[hidden]{display:none}
 #worldMap{position:absolute;inset:0}
+.lochelp{position:absolute;left:50%;top:70px;transform:translateX(-50%);width:min(460px,92vw);background:#0b0f10f2;border:1px solid #d9b46a;border-radius:6px;padding:14px 16px;z-index:2}
+.lochelp>b{font:800 16px Cinzel,serif;color:var(--gold)}.lochelp p{color:var(--text);font-size:14px}
+.lochelp[hidden],.locgps[hidden]{display:none}
+.locgps{position:absolute;right:10px;bottom:70px}
 .wbar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;justify-content:space-between;font:700 13px Inter;pointer-events:none}
 .wbar>*{pointer-events:auto}
 #worldStatus{background:#000c;border:1px solid #d9b46a66;padding:7px 12px;border-radius:4px}
@@ -263,6 +267,9 @@ table.ctl td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
   <div id="worldMap"></div>
   <div class="wbar"><button class="wbtn" id="worldBack" aria-label="Back to menu">‹ Menu</button><span id="worldStatus">Map</span><button class="wbtn" id="recenter" aria-label="Centre on me">◎</button></div>
   <div class="wmsg" id="worldMsg">Loading the map…</div>
+  <div class="lochelp" id="locHelp" hidden><b>Location needed</b><p id="locText"></p>
+    <div class="actions"><button class="btn" id="locRetry">Try again</button><button class="btn alt" id="locDemo">Use demo mode</button></div></div>
+  <button class="wbtn locgps" id="locGps" hidden>Use real GPS</button>
   <div class="wwarn" id="speedWarn" hidden>Moving too fast. Familiar interactions are paused. Never play while driving.</div>
   <div class="overlay" id="safety" hidden><div class="card" style="max-width:520px;margin-top:10vh">
     <h1 style="font-size:28px">Before you explore</h1>
@@ -273,6 +280,6 @@ table.ctl td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Summoning assets…</div></div>
-<script type="module" src="game.js?v=4"></script>
+<script type="module" src="game.js?v=5"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // Tomecraft world map (M6 alpha): MapLibre + OpenFreeMap vector tiles, phone GPS, familiar markers.
 // Location never leaves the device. Needs the hosted site: Claude artifact pages block location and map tiles.
-import * as World from './world.js?v=4';
-import * as Col from './collection.js?v=4';
+import * as World from './world.js?v=5';
+import * as Col from './collection.js?v=5';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -19,6 +19,9 @@ export function initWorld(hooks) {
   $('worldBack').onclick = closeWorld;
   $('safetyOk').onclick = () => { st.safetyOk = true; $('safety').hidden = true; startLocation(); };
   $('demoBtn').onclick = () => { st.safetyOk = true; $('safety').hidden = true; startDemo('You chose demo mode.'); };
+  $('locRetry').onclick = () => { $('locHelp').hidden = true; if (st.watch) { navigator.geolocation.clearWatch(st.watch); st.watch = null; } startLocation(); };
+  $('locDemo').onclick = () => { $('locHelp').hidden = true; startDemo('Demo mode.'); };
+  $('locGps').onclick = () => { st.demo = false; st.demoTarget = null; st.gotFix = false; $('locGps').hidden = true; startLocation(); };
   $('recenter').onclick = () => st.pos && st.map && st.map.easeTo({ center: [st.pos.lon, st.pos.lat], zoom: 17.3 });
 }
 
@@ -89,16 +92,43 @@ function addOverlays() {
 }
 
 // ---- location ----
+const inAppBrowser = () => /Claude\/|FBAN|FBAV|Instagram|Line\/|; wv\)/.test(navigator.userAgent);
+const isIOS = () => /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+function showLocHelp(kind) {
+  const url = location.origin + location.pathname;
+  const how = isIOS()
+    ? 'On iPhone: Settings → Privacy & Security → Location Services must be on, and Safari Websites set to "While Using". Then in Safari tap the <b>aA</b> button → Website Settings → Location → Allow, and tap Try again.'
+    : /Android/.test(navigator.userAgent)
+      ? 'On Android: make sure Location is on in quick settings. In Chrome, tap the icon left of the address → Permissions → Location → Allow, then tap Try again.'
+      : 'On a computer: click the icon left of the address bar → Location → Allow. On a Mac, also check System Settings → Privacy & Security → Location Services for your browser. Desktops often have no GPS, so the game is best on a phone.';
+  const text = {
+    inapp: `This browser can't share your location (the Claude app's built-in browser and some in-app browsers block it). Open <b>${url}</b> in Safari or Chrome on your phone.`,
+    denied: `Location is blocked for this site. ${how}`,
+    slow: 'Still waiting for a GPS fix. Step outside or near a window; it can take up to a minute the first time. The game keeps trying.',
+    none: 'This browser has no location support. Open the game in Safari or Chrome on your phone.',
+  }[kind];
+  $('locText').innerHTML = text;
+  $('locHelp').hidden = false;
+  $('locRetry').hidden = kind === 'none' || kind === 'inapp';
+}
 function startLocation() {
-  if (st.demo) return;
-  if (!('geolocation' in navigator)) return startDemo('This browser has no location access.');
+  if (st.demo || st.watch) return;
+  $('locHelp').hidden = true;
+  if (!('geolocation' in navigator)) return showLocHelp('none');
+  // Ask straight away, inside the tap: some phones only show the permission prompt during a user gesture.
   $('worldStatus').textContent = 'Finding your location…';
+  // Quick coarse fix first (fast indoors), then keep a high-accuracy watch running.
+  navigator.geolocation.getCurrentPosition(onFix, () => {}, { enableHighAccuracy: false, maximumAge: 60000, timeout: 15000 });
+  st.slowTimer = setTimeout(() => { if (!st.gotFix && !st.demo) showLocHelp('slow'); }, 20000);
   st.watch = navigator.geolocation.watchPosition(onFix, (err) => {
-    navigator.geolocation.clearWatch(st.watch); st.watch = null;
-    startDemo(err.code === 1 ? 'Location permission was denied.' : 'Your location could not be found.');
-  }, { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 });
+    if (err.code === 1) { navigator.geolocation.clearWatch(st.watch); st.watch = null; showLocHelp(inAppBrowser() ? 'inapp' : 'denied'); }
+    else $('worldStatus').textContent = err.code === 3 ? 'Waiting for GPS…' : 'GPS signal weak, retrying…';
+  }, { enableHighAccuracy: true, maximumAge: 2000 });
 }
 function onFix(p) {
+  if (st.demo) return;
+  clearTimeout(st.slowTimer); $('locHelp').hidden = true;
+  if (!st.gotFix) { st.gotFix = true; if (st.map) st.map.jumpTo({ center: [p.coords.longitude, p.coords.latitude], zoom: 17.3 }); }
   const fix = { lat: p.coords.latitude, lon: p.coords.longitude, t: p.timestamp || Date.now(), speed: p.coords.speed };
   const g = World.speedGate(H.cfg, st.prevFix, fix);
   fix.speedEst = g.speed; st.prevFix = fix;
@@ -109,8 +139,8 @@ function startDemo(reason) {
   st.demo = true;
   const s = st.pos || H.cfg.world.demoStart;
   setPosition(s.lat, s.lon, 5, false);
-  $('worldMsg').textContent = `${reason} Demo mode: tap the map to walk there.`;
-  $('demoBtn').hidden = true;
+  $('worldMsg').textContent = `${reason} Tap the map to walk there.`;
+  $('locGps').hidden = false;
 }
 function setPosition(lat, lon, acc, tooFast) {
   const first = !st.pos;

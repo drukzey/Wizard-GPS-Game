@@ -1,10 +1,10 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=4';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=4';
-import * as Col from './collection.js?v=4';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=4';
+import { createSim } from './sim.js?v=5';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=5';
+import * as Col from './collection.js?v=5';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=5';
 
 const $ = (id) => document.getElementById(id);
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -110,7 +110,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=4`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=5`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`);
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -119,7 +119,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = (await import('./pub/anims.js?v=4')).default;
+    const packed = (await import('./pub/anims.js?v=5')).default;
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -128,7 +128,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = (await import('./pub/models.js?v=4')).default;
+  const models = (await import('./pub/models.js?v=5')).default;
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -909,7 +909,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=4')).json();
+    cfg = await (await fetch('data/config.json?v=5')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
