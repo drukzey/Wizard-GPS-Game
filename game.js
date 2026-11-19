@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=34';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=34';
-import * as Col from './collection.js?v=34';
-import * as P from './progression.js?v=34';
-import * as S from './sanctuary.js?v=34';
-import * as Stage from './stage.js?v=34';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=34';
-import * as World from './world.js?v=34';
+import { createSim } from './sim.js?v=35';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=35';
+import * as Col from './collection.js?v=35';
+import * as P from './progression.js?v=35';
+import * as S from './sanctuary.js?v=35';
+import * as Stage from './stage.js?v=35';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=35';
+import * as World from './world.js?v=35';
 
 const $ = (id) => document.getElementById(id);
-const VER = 34; // cache-busting version, kept in step by stamp.py
+const VER = 35; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -76,7 +76,8 @@ const UI_SPRITES = ['orbL', 'orbR', 'orbGlass', 'orbSheen', 'ring', 'ringBg', 'b
   'f_panel', 'f_wide', 'f_card', 'f_card2', 'f_btn', 'f_tab', 'f_btn2', 'f_ring', 'f_diamond', 'f_bar', 'f_brackets', 'f_crest', 'f_line',
   'n_play', 'n_journal', 'n_wizard', 'n_home', 'n_map', 'n_settings', 'n_scroll', 'n_medal', 'c_gold', 'c_essence', 'm_rune', 'm_stone', 'm_ore', 'chest',
   's_weapon', 's_robe', 's_boots', 's_amulet', 's_ring', 'n_craft', 'n_research', 'n_forge', 'n_dwelling', 'n_chamber', 'n_library', 'n_lock',
-  'g_bar', 'g_card', 'g_wide', 'g_archbg', 'g_arch', 'g_row', 'g_slot', 'g_goal', 'g_obj_on', 'g_obj_off', 'g_parch', 'g_tip', 'g_close', 'g_notice', 'g_flag', 'g_tog_bg', 'g_tog_l', 'g_tog_r', 'g_fill', 'g_glow'];
+  'g_bar', 'g_card', 'g_wide', 'g_archbg', 'g_arch', 'g_row', 'g_slot', 'g_goal', 'g_obj_on', 'g_obj_off', 'g_parch', 'g_tip', 'g_close', 'g_notice', 'g_flag', 'g_tog_bg', 'g_tog_l', 'g_tog_r', 'g_fill', 'g_glow',
+  'p_monster', 'p_magic', 'p_skull', 'p_unknown', 'p_ring', 'p_ringu', 'p_dia', 'p_diau', 'p_dia2', 'p_dia2u'];
 const assets = { atlas: {}, models: {}, tex: {}, lib: null };
 const uiSrc = {}, spriteUrl = (k) => uiSrc[k] || '';
 
@@ -121,7 +122,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=34`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=35`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -130,7 +131,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=34')).default, ...(await import('./pub/anims_m5.js?v=34')).default, ...(await import('./pub/anims_custom.js?v=34')).default };
+    const packed = { ...(await import('./pub/anims.js?v=35')).default, ...(await import('./pub/anims_m5.js?v=35')).default, ...(await import('./pub/anims_custom.js?v=35')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -139,7 +140,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=34')).default, ...(await import('./pub/models_m4.js?v=34')).default };
+  const models = { ...(await import('./pub/models.js?v=35')).default, ...(await import('./pub/models_m4.js?v=35')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -170,7 +171,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=34')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=35')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       const df = name.startsWith('df_'); // Dark Fantasy pieces use their own atlas, and their fire and runes glow
@@ -192,6 +193,10 @@ function instance(key) {
     try {
       const an = new Animator(assets.lib, g.children[0]);
       if (an.ok) {
+        if (key === 'mage') { // the rig's wrist comes out of retargeting palm-down; turn it so the fist faces forward around the staff (solved from the hand mesh)
+          let hand = null; g.traverse((o) => { if (o.name === 'Hand_R') hand = o; });
+          if (hand) an.post.push([hand, new THREE.Quaternion(-0.6176, -0.1715, -0.0517, 0.7658)]);
+        }
         if (key === 'mage') an.alias = Object.fromEntries(Object.entries({ idle: 'staffIdle', walk: 'staffWalk', cast: 'staffCast' }).filter(([, c]) => assets.lib.clips[c])); // custom Blender clips: the wizard always holds the staff
         g.userData.anim = an; an.setLoco({ idle: 1 }); an.update(0);
       }
@@ -834,9 +839,11 @@ function openRift(rift, distance) {
   pendingRift = { rift, portal: distance === null };
   $('riftGo').textContent = 'Enter rift'; $('riftGo').hidden = false;
   const c = rift.clearReward, lvl = P.levelInfo(cfg, prof.xp).level, locked = lvl < rift.minLevel;
-  $('riftBody').innerHTML = `<h1 style="font-size:32px">${rift.name}</h1><p>${rift.desc}</p>
-    <div class="tags">${rift.modifiers.map((m) => `<span class="tag" style="--c:var(--brass)">${cfg.riftModifiers[m].name}: ${cfg.riftModifiers[m].desc.toLowerCase()}</span>`).join('')}</div>
-    <p class="s" style="margin-top:10px">${distance === null ? 'You are at the portal: the clear bonus is 50% bigger.' : `The portal is ${distance} m away. Walk to it for a 50% bigger clear bonus, or enter now from here.`}</p>
+  const boss = rift.waves.flat().some((e) => /god/.test(e));
+  $('riftBody').innerHTML = `<div class="riftHead"><span class="pin pRift"><i></i></span><div><small>Rift · level ${rift.minLevel}+ · ${rift.waves.length} waves${boss ? ' · boss' : ''}</small><h1>${rift.name}</h1></div></div>
+    <p>${rift.desc}</p>
+    ${rift.modifiers.length ? `<div class="riftMods">${rift.modifiers.map((m) => `<div><b>${cfg.riftModifiers[m].name}</b><span>${cfg.riftModifiers[m].desc}</span></div>`).join('')}</div>` : ''}
+    <div class="riftWhere${distance === null ? ' here' : ''}">${distance === null ? 'You stand at the portal: clear bonus +50%' : `Portal ${distance} m away. Walk there for +50%, or enter from here.`}</div>
     <div class="cost">${rewardHtml(distance === null ? scaleReward(c, cfg.world.portalBonus) : c)}</div>${locked ? `<p class="lock">Reach wizard level ${rift.minLevel} to enter</p>` : ''}`;
   $('riftGo').disabled = locked || loadout.length !== 3;
   $('riftOv').hidden = false;
@@ -1500,7 +1507,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=34')).json();
+    cfg = await (await fetch('data/config.json?v=35')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
@@ -1515,7 +1522,8 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
     renderLegend();
     setInterval(tickWilds, 1000);
     initWorld({ cfg, col: () => col, saveCol, rarityCfg, icon, css, toast, openBinding,
-      store, instance, loadModel, attachStaff: Stage.attachStaff, staffModel: () => weaponModel(), creatureIdle: Stage.creatureIdle, openRift, visitShrine, onNearby: renderNearby });
+      store, instance, loadModel, attachStaff: Stage.attachStaff, staffModel: () => weaponModel(), creatureIdle: Stage.creatureIdle, openRift, visitShrine, onNearby: renderNearby,
+      face: (fid) => (unknownSpecies(fid) ? '' : portraits[fid] || ''), sigil: assets.tex.sigilL });
     await Stage.setHubLoadout(loadout, weaponModel());
     $('loading').remove();
     makePortraits(); renderAvatar(); renderNearbyButton();

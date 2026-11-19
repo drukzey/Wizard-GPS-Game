@@ -421,9 +421,9 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .pageHead h1::before{content:'';position:absolute;z-index:-1;left:0;right:0;top:-40px;height:calc(100% + 64px);background:#5a1c15;-webkit-mask:var(--u-g_flag) top/100% 100% no-repeat;mask:var(--u-g_flag) top/100% 100% no-repeat;filter:drop-shadow(0 4px 8px #000)}
 /* loading: static paths, since the sprite variables are not ready yet */
 #loading{background:radial-gradient(ellipse at 50% 40%,#2a2342,#0b0a14 72%)}
-#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=34') center/contain no-repeat;opacity:.9}
+#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=35') center/contain no-repeat;opacity:.9}
 #loading h1{font-size:56px;text-shadow:0 3px 12px #000,0 0 30px #7b5cd666}
-#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=34') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
+#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=35') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
 #loading .lb i{background:linear-gradient(90deg,#b8862e,#f2cf86)}
 #loadT{font:600 15px var(--body);color:#c9bfa8}
 
@@ -480,6 +480,33 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .nearbyBtn .scLabel small{font-size:11px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
 .avatarBtn .scLabel b{font-size:17px}
 @media (max-width:360px){.bottomBar{grid-template-columns:1fr 84px 1fr;gap:6px;padding:0 6px}.tomeBtn{width:84px;height:84px}.tomeBtn .sprite{width:38px;height:38px}.avWrap{width:44px;height:44px}.avWrap img{inset:4px;width:36px;height:36px}.xpRing{-webkit-mask:radial-gradient(circle,transparent 18px,#000 19px);mask:radial-gradient(circle,transparent 18px,#000 19px)}.avatarBtn .scLabel b{font-size:15px}.nearFaces .slot{width:26px;height:26px}}
+/* map pins (Synty Dark Fantasy map icons): one shape per kind, floating above the 3D figure */
+.hit .pin{position:absolute;left:50%;bottom:100%;transform:translateX(-50%);pointer-events:none;filter:drop-shadow(0 2px 4px #000c)}
+.pFam{width:40px;height:40px;display:flex;align-items:center;justify-content:center;background:radial-gradient(circle,#0d1112 58%,transparent 60%)}
+.pFam::before{content:'';position:absolute;inset:0;background:var(--pc);-webkit-mask:var(--u-p_ring) center/contain no-repeat;mask:var(--u-p_ring) center/contain no-repeat}
+.pFam img{width:28px;height:28px;border-radius:50%;object-fit:cover}
+.pFam i{width:20px;height:20px;background:var(--pc);-webkit-mask:var(--u-p_unknown) center/contain no-repeat;mask:var(--u-p_unknown) center/contain no-repeat}
+.pShrine{width:38px;height:38px;display:flex;align-items:center;justify-content:center}
+.pShrine::before{content:'';position:absolute;inset:0;background:var(--pc);-webkit-mask:var(--u-p_diau) center/contain no-repeat;mask:var(--u-p_diau) center/contain no-repeat;opacity:.5}
+.pShrine::after{content:'';position:absolute;inset:0;background:var(--pc);-webkit-mask:var(--u-p_dia) center/contain no-repeat;mask:var(--u-p_dia) center/contain no-repeat}
+.pShrine i{width:16px;height:16px;background:#f3ead2;-webkit-mask:var(--u-p_magic) center/contain no-repeat;mask:var(--u-p_magic) center/contain no-repeat}
+.pRift{width:46px;height:56px;display:flex;align-items:flex-start;justify-content:center;padding-top:10px}
+.pRift::before{content:'';position:absolute;inset:0;background:#ff4a3a;-webkit-mask:var(--u-p_dia2u) center/contain no-repeat;mask:var(--u-p_dia2u) center/contain no-repeat;opacity:.55}
+.pRift::after{content:'';position:absolute;inset:0;background:#e0463a;-webkit-mask:var(--u-p_dia2) center/contain no-repeat;mask:var(--u-p_dia2) center/contain no-repeat}
+.pRift i{width:18px;height:18px;background:#f3ead2;-webkit-mask:var(--u-p_skull) center/contain no-repeat;mask:var(--u-p_skull) center/contain no-repeat;position:relative;z-index:1}
+.hit.near .pin{animation:pinBob 1.6s ease-in-out infinite}
+@keyframes pinBob{50%{transform:translateX(-50%) translateY(-5px)}}
+@media (prefers-reduced-motion:reduce){.hit.near .pin{animation:none}}
+.hit em{top:auto;bottom:calc(100% + 60px)}
+/* rift card */
+#riftOv .card{border-image-source:var(--u-g_card);background:linear-gradient(#1d1012f5,#0f0b0cf5) padding-box}
+.riftHead{display:flex;gap:12px;align-items:center;margin-bottom:6px}
+.riftHead .pin{position:relative;left:auto;bottom:auto;transform:none;flex:none}
+.riftHead small{font:600 12px var(--body);color:#e0907f}.riftHead h1{font-size:30px;margin:0;line-height:1}
+.riftMods{display:grid;gap:6px;margin:8px 0}
+.riftMods>div{border:7px solid transparent;border-image:var(--u-g_row) 40 / 10px stretch;background:#140d0e padding-box;padding:4px 8px}
+.riftMods b{display:block;font:700 15px var(--display);color:#f0b39a}.riftMods span{font:500 13px var(--body);color:var(--ash)}
+.riftWhere{font:600 13px var(--body);color:var(--ash);margin:8px 0 4px}.riftWhere.here{color:#ffd28a}
 </style>
 </head>
 <body>
@@ -657,6 +684,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=34"></script>
+<script type="module" src="game.js?v=35"></script>
 </body>
 </html>

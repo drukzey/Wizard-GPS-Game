@@ -110,7 +110,7 @@ export class Animator {
 
     }
     this.cur = null; this.oneShot = null; this.loco = {};
-    this.alias = {}; // per-character clip swaps, e.g. the wizard's staff versions of idle, walk and cast
+    this.post = []; this.alias = {}; // per-character clip swaps, e.g. the wizard's staff versions of idle, walk and cast
   }
 
   setLoco(weights, timeScale = 1) {
@@ -155,6 +155,7 @@ export class Animator {
       const parentQ = p.parentPair ? p.parentPair.cur : p.parentRest;
       p.t.quaternion.copy(_q2.copy(parentQ).invert().multiply(p.cur));
     }
+    for (const [b, q] of this.post) b.quaternion.multiply(q); // fixed per-character corrections (the wizard's wrist around the staff)
     // hips: vertical and planar offsets (in-place clips keep this small)
     const sNow = worldP(this.hipsS, _p).clone();
     const d = sNow.sub(this.sHipsRest).applyQuaternion(this.Y).multiplyScalar(this.hRatio);

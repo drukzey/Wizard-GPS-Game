@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=34';
-import * as Col from './collection.js?v=34';
+import * as World from './world.js?v=35';
+import * as Col from './collection.js?v=35';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -147,10 +147,13 @@ const layer3d = {
     for (const th of g3.things.values()) {
       th.userData.anim?.update(dt);
       if (th.userData.model) H.creatureIdle(th.userData.body, th.userData.model, t + th.userData.phase);
-      if (th.userData.spin) th.userData.spin.rotation.y = t * 0.8;
+      if (th.userData.spin) th.userData.spin.rotation.y = t * (th.userData.vortex ? 0.25 : 0.8);
+      if (th.userData.vortex) { th.userData.vortex.material.uniforms.t.value = t; th.userData.vortex.rotation.y = -(st.map.getBearing() * Math.PI) / 180 - th.rotation.y; }
+      if (th.userData.sigil) th.userData.sigil.rotation.z = t * 0.1;
       if (th.userData.ring) th.userData.ring.material.opacity = 0.55 + 0.25 * Math.sin(t * 3 + th.userData.phase);
       if (th.userData.halo) { const k = 1 + 0.08 * Math.sin(t * 2 + th.userData.phase); th.userData.halo.scale.set(k * th.userData.haloSize, k * th.userData.haloSize, 1); }
     }
+    if (trees.group) for (const t of trees.group.children) for (const w of t.children) if (w.userData.wisp !== undefined) { w.position.y += Math.sin(t3(t, w)) * 0.002 / t.scale.x; }
     if (g3.motes) {
       const p = g3.motes.geometry.attributes.position, w = g3.wizard ? g3.wizard.position : { x: 0, z: 0 };
       g3.motes.position.set(w.x, 0, w.z);
@@ -192,10 +195,6 @@ async function addShrine3d(site) {
   const h = halo(new THREE.Color(T.glow), 16); h.position.y = 6; g.add(h); g.userData.halo = h;
   const m = await fitModel(T.model, 9); if (m && g3.things.get(site.id) === g) g.add(m);
 }
-async function addRuins(g) { // a broken ruin and two torches make every portal a landmark
-  const r = await fitModel('df_ruin2', 15); if (r) { r.position.z = -9; g.add(r); }
-  for (const x of [-10, 10]) { const t = await fitModel('df_torch', 6); if (!t) continue; t.position.x = x; t.position.z = 3; g.add(t); const hl = halo(0xff9a4a, 6); hl.position.set(x, 6, 3); g.add(hl); }
-}
 function setOrigin(pos) {
   g3.origin = { ...pos }; g3.merc = maplibregl.MercatorCoordinate.fromLngLat([pos.lon, pos.lat], 0);
   for (const th of [...g3.things.values(), ...(trees.group?.children || [])]) { const p = local(th.userData.at); th.position.set(p.x, 0, p.z); }
@@ -226,17 +225,35 @@ function addFamiliar3d(s) {
   g.rotation.y = Math.random() * Math.PI * 2;
   const p = local(s); g.position.set(p.x, 0, p.z); g3.scene.add(g); g3.things.set(s.id, g);
 }
+// Rift: a tear in the air inside a broken ring of Dark Fantasy ruins, with a rune circle burned into the ground,
+// a beam of red light, and rock shards drifting around it. Every rift reads the same way from any distance.
+const VORTEX = { vertex: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragment: `uniform float t; varying vec2 vUv;
+    void main(){ vec2 p = vUv * 2.0 - 1.0; p.x *= 0.62; float r = length(p); if (r > 1.0) discard;
+      float a = atan(p.y, p.x) + t * 0.9 + 3.0 / (r + 0.25);
+      float swirl = 0.5 + 0.5 * sin(a * 5.0 - r * 9.0 + t * 2.0);
+      vec3 core = vec3(0.05, 0.0, 0.08), mid = vec3(0.55, 0.06, 0.32), edge = vec3(1.0, 0.42, 0.24);
+      vec3 c = mix(core, mid, smoothstep(0.05, 0.75, r)); c = mix(c, edge, smoothstep(0.75, 1.0, r) * (0.6 + 0.4 * swirl));
+      c += mid * swirl * 0.35 * smoothstep(0.2, 0.9, r);
+      gl_FragColor = vec4(c, smoothstep(1.0, 0.86, r)); }` };
 function addPortal3d(site) {
-  const g = new THREE.Group(); g.userData = { at: site, phase: Math.random() * 6 };
-  const col = 0xc8463a, glow = new THREE.MeshBasicMaterial({ color: 0xff8a5c, transparent: true, opacity: 0.85 });
-  const spin = new THREE.Group(); g.add(spin); g.userData.spin = spin;
-  const torus = new THREE.Mesh(new THREE.TorusGeometry(7, 0.7, 10, 48), new THREE.MeshLambertMaterial({ color: 0x3b3f44, emissive: col, emissiveIntensity: 0.6 }));
-  torus.position.y = 8.5; spin.add(torus);
-  const inner = new THREE.Mesh(new THREE.CircleGeometry(6.4, 40), new THREE.MeshBasicMaterial({ color: 0x5a1a40, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
-  inner.position.y = 8.5; spin.add(inner);
-  for (let i = 0; i < 6; i++) { const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), glow); const a = (i / 6) * Math.PI * 2; shard.position.set(Math.cos(a) * 9, 8.5 + Math.sin(a) * 9, 0); spin.add(shard); }
-  const ring = groundRing(col, 7, 9); g.add(ring); g.userData.ring = ring;
-  g.userData.haloSize = 26; const hl = halo(0xff6a5c, 26); hl.position.y = 8.5; g.add(hl); g.userData.halo = hl; addRuins(g);
+  const g = new THREE.Group(); g.userData = { at: site, phase: Math.random() * 6, haloSize: 22 };
+  const vortex = new THREE.Mesh(new THREE.PlaneGeometry(10, 16), new THREE.ShaderMaterial({ uniforms: { t: { value: 0 } }, vertexShader: VORTEX.vertex, fragmentShader: VORTEX.fragment, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  vortex.position.y = 9.5; g.add(vortex); g.userData.vortex = vortex;
+  const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 4.5, 60, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xff3a3a, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+  beam.position.y = 30; g.add(beam);
+  const ring = groundRing(0xd8342c, 9, 10.5); g.add(ring); g.userData.ring = ring;
+  if (H.sigil) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), new THREE.MeshBasicMaterial({ map: H.sigil, color: 0xff5040, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })); sg.rotation.x = -Math.PI / 2; sg.position.y = 0.25; g.add(sg); g.userData.sigil = sg; }
+  const hl = halo(0xff4a5c, 22); hl.position.y = 9.5; g.add(hl); g.userData.halo = hl;
+  const orbit = new THREE.Group(); g.add(orbit); g.userData.spin = orbit; // drifting shards
+  (async () => {
+    for (let i = 0; i < 5; i++) { const r = await fitModel(['rock1', 'rock2', 'rock3'][i % 3], 1.6 + (i % 2)); if (!r) continue; const a = (i / 5) * Math.PI * 2; r.position.set(Math.cos(a) * 8, 6 + (i % 3) * 3, Math.sin(a) * 8); r.rotation.set(i, i * 2, 0); orbit.add(r); }
+    // a broken ring of ruins behind and beside the tear, and two torches flanking the way in
+    for (const [name, h, a, d] of [['df_ruin2', 14, Math.PI, 11], ['df_ruin1', 9, Math.PI * 0.62, 12], ['df_ruin3', 9, -Math.PI * 0.62, 12]]) {
+      const r = await fitModel(name, h); if (!r) continue; r.position.x += Math.sin(a) * d; r.position.z += Math.cos(a) * d; r.rotation.y = a; g.add(r);
+    }
+    for (const x of [-6, 6]) { const t = await fitModel('df_torch', 5); if (!t) continue; t.position.set(x, t.position.y, 8); g.add(t); const hl2 = halo(0xff9a4a, 6); hl2.position.set(x, 5.4, 8); g.add(hl2); }
+  })();
   const p = local(site); g.position.set(p.x, 0, p.z); g3.scene.add(g); g3.things.set(site.id, g);
 }
 // Scenery: trees on the map's parks and grass, at fixed spots per cell so they never shuffle. Cheap Kingdom tree model.
@@ -278,8 +295,41 @@ async function plantTrees() {
     };
     await add(FLORA[kind], 3 + Math.floor(r() * 4), 11, 8);
     await add(FLORA.under, 2 + Math.floor(r() * 3), 6, 2.5);
+    if (r() < 0.35) { // a grove's secret: a small ley crystal at its heart with drifting wisps
+      const cr = await floraModel('crystal3'); if (cr) { const m = cr.m.clone(); m.scale.setScalar(3.2 / Math.max(1e-3, cr.h)); const l = local(centre); m.position.set(l.x, 0, l.z); m.userData.at = centre; trees.group.add(m);
+        for (let i = 0; i < 4; i++) { const w = halo([0x7ff0e0, 0xc7a6ff, 0xfff1a8][i % 3], 2.2 / m.scale.x); w.position.set((r() - 0.5) * 10 / m.scale.x, (3 + r() * 5) / m.scale.x, (r() - 0.5) * 10 / m.scale.x); w.userData.wisp = r() * 6; m.add(w); } }
+    }
   }
-  for (const t of trees.group.children) t.visible = Math.hypot(t.position.x - local(st.pos).x, t.position.z - local(st.pos).z) < 330;
+  await lightLeyLines();
+  const me = local(st.pos); for (const t of trees.group.children) t.visible = Math.hypot(t.position.x - me.x, t.position.z - me.z) < 330;
+}
+const t3 = (t, w) => (g3.clock.elapsedTime + w.userData.wisp) * 1.5;
+// Magic with a reason: lanterns light the ley lines (footpaths) at a steady stride; some groves hide a ley crystal with wisps.
+const lamps = new Set();
+async function lightLeyLines() {
+  let lines = [];
+  try { lines = st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'transportation', filter: ['==', ['get', 'class'], 'path'] }); } catch { return; }
+  const src = await floraModel('lamp'); if (!src) return;
+  const me = st.pos, mLat = 111320, mLon = 111320 * Math.cos((me.lat * Math.PI) / 180);
+  for (const f of lines) {
+    const parts = f.geometry.type === 'LineString' ? [f.geometry.coordinates] : f.geometry.type === 'MultiLineString' ? f.geometry.coordinates : [];
+    for (const line of parts) {
+      let carry = 0;
+      for (let i = 1; i < line.length; i++) {
+        const [x0, y0] = line[i - 1], [x1, y1] = line[i], dx = (x1 - x0) * mLon, dy = (y1 - y0) * mLat, len = Math.hypot(dx, dy); if (len < 0.1) continue;
+        for (let d = 38 - carry; d < len; d += 38) {
+          const u = d / len, p = { lon: x0 + (x1 - x0) * u, lat: y0 + (y1 - y0) * u };
+          if (Math.abs(p.lat - me.lat) * mLat > 320 || Math.abs(p.lon - me.lon) * mLon > 320) continue;
+          const key = `${Math.round(p.lat * 4e4)}:${Math.round(p.lon * 4e4)}`; if (lamps.has(key)) continue; lamps.add(key);
+          const side = (Math.round(p.lat * 1e5) % 2) ? 1 : -1, nx = (-dy / len) * 2.6 * side, ny = (dx / len) * 2.6 * side; // stand beside the path, not on it
+          const q = { lat: p.lat + ny / mLat, lon: p.lon + nx / mLon }; if (insideBuilding(q)) continue;
+          const lamp = src.m.clone(); lamp.scale.setScalar(7 / Math.max(1e-3, src.h)); const l = local(q); lamp.position.set(l.x, 0, l.z); lamp.userData.at = q;
+          const glow = halo(0xffc46a, 5 / lamp.scale.x); glow.position.y = 6.3 / lamp.scale.x; lamp.add(glow); trees.group.add(lamp);
+        }
+        carry = (len + carry) % 38;
+      }
+    }
+  }
 }
 function removeThing(id) { const g = g3.things.get(id); if (g) { g3.scene.remove(g); g3.things.delete(id); } }
 
@@ -395,9 +445,17 @@ function safeSkip(s) {
 }
 const spawnLabel = (s) => { const f = H.cfg.familiars[s.familiarId], r = H.rarityCfg(s.rarity); return `${f.name}, ${r.label}`; };
 /** An invisible, focusable hit area over each 3D figure; the name tag shows once it is in reach. */
+/** Each kind gets its own Synty map pin so they read apart at a glance:
+ *  familiar = rarity-coloured octagon with the creature's face, shrine = glowing diamond with a sigil, rift = crimson spire with a skull. */
+function pinHtml(s, kind) {
+  if (kind === 'shrine') return `<span class="pin pShrine" style="--pc:${H.cfg.shrines.types[s.type].glow}"><i></i></span>`;
+  if (kind === 'rift') return '<span class="pin pRift"><i></i></span>';
+  const r = H.rarityCfg(s.rarity), face = H.face ? H.face(s.familiarId) : '';
+  return `<span class="pin pFam" style="--pc:${r.color}">${face ? `<img src="${face}" alt="">` : '<i></i>'}</span>`;
+}
 function hitMarker(s, onTap, label, kind = 'spawn') {
   const el = document.createElement('button'); el.className = `hit ${kind}`;
-  el.innerHTML = `<em>${label}</em>`;
+  el.innerHTML = `${pinHtml(s, kind)}<em>${label}</em>`;
   el.onclick = (e) => { e.stopPropagation(); onTap(); };
   const m = new maplibregl.Marker({ element: el, anchor: 'bottom' }).setLngLat([s.lon, s.lat]).addTo(st.map);
   el.setAttribute('aria-label', label); // MapLibre replaces it with "Map marker"

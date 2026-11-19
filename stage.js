@@ -52,7 +52,7 @@ export function buildHub() {
 const findBone = (root, re) => { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; };
 
 // How a staff sits in the old Synty rig's right hand (tuned by eye; the hand's local X runs along the fingers).
-export const staffTune = { len: 1.75, rx: -3.1, ry: -0.13, rz: 2.68, grip: 0.53, ox: 0, oy: 0, oz: 0, curl: 1.1 };
+export const staffTune = { len: 1.75, rx: -4.28, ry: 2.02, rz: 2.68, grip: 0.53, ox: -0.0719, oy: 0.0083, oz: 0.0852, curl: 0 }; // solved in the browser against the wizard's hand mesh: shaft through the fist, foot on the ground
 /** Close the hand around the shaft: the animations don't drive finger bones, so they keep this pose. */
 function curlFingers(hand, amount) {
   hand.traverse((b) => { if (!b.isBone || b === hand) return;
