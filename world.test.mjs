@@ -76,3 +76,15 @@ test('rift portals sit at fixed places, the same for everyone, and only map rift
   for (const s of a) assert.ok(cfg.rifts.find((r) => r.id === s.riftId).onMap);
   assert.ok(W.riftInRange(cfg, a[0], a[0]));
 });
+
+test('shrines: fixed per cell, snap to a real point of interest when there is one, and pay once per cooldown', () => {
+  const pos = cfg.world.demoStart, now = 1_800_000_000_000;
+  const a = W.shrineSites(cfg, pos, 800), b = W.shrineSites(cfg, pos, 800);
+  assert.ok(a.length > 3); assert.deepEqual(a.map((s) => s.id), b.map((s) => s.id));
+  const s0 = a[0], poi = { id: 'poi1', lat: s0.lat + 0.00001, lon: s0.lon + 0.00001, name: 'Cafe' };
+  const withPoi = W.shrineSites(cfg, pos, 800, [poi]).find((s) => s.id === s0.id);
+  assert.equal(withPoi.name, 'Cafe'); assert.equal(withPoi.lat, poi.lat);
+  const v1 = W.shrineVisit(cfg, s0, now), v2 = W.shrineVisit(cfg, s0, now + 1000), v3 = W.shrineVisit(cfg, s0, now + cfg.shrines.cooldownMin * 60000);
+  assert.equal(v1.txId, v2.txId); assert.notEqual(v1.txId, v3.txId);
+  assert.ok(v1.reward.gold >= cfg.shrines.gold[0] && v1.reward.gold <= cfg.shrines.gold[1]);
+});

@@ -1490,5 +1490,189 @@
         }
       }
     ]
-  }
+  },
+  "shrines": {
+    "cellM": 170,
+    "emptyCellChance": 0.25,
+    "radiusM": 40,
+    "cooldownMin": 10,
+    "xp": 10,
+    "gold": [
+      8,
+      20
+    ],
+    "types": {
+      "ember": {
+        "name": "Ember Shrine",
+        "model": "df_brazier",
+        "glow": "#ff8a3c",
+        "desc": "A brazier that never goes out.",
+        "materials": {
+          "ore": [
+            1,
+            3
+          ]
+        }
+      },
+      "watch": {
+        "name": "Gargoyle Watch",
+        "model": "df_gargoyle",
+        "glow": "#9fd4ff",
+        "desc": "A stone watcher that remembers old spells.",
+        "materials": {
+          "runeFragments": [
+            1,
+            2
+          ]
+        }
+      },
+      "angel": {
+        "name": "Angel's Rest",
+        "model": "angel",
+        "glow": "#f0e2a8",
+        "desc": "A statue humming with quiet magic.",
+        "materials": {
+          "arcaneStone": [
+            1,
+            2
+          ]
+        }
+      },
+      "relic": {
+        "name": "Forgotten Statue",
+        "model": "df_statue",
+        "glow": "#c7a6ff",
+        "desc": "Coins collect at its feet.",
+        "materials": {
+          "ore": [
+            0,
+            1
+          ]
+        }
+      },
+      "ley": {
+        "name": "Ley Crystal",
+        "model": "crystal3",
+        "glow": "#7ff0e0",
+        "desc": "Raw magic seeping from the ground.",
+        "essence": 3,
+        "materials": {
+          "arcaneStone": [
+            0,
+            1
+          ]
+        }
+      }
+    }
+  },
+  "goals": [
+    {
+      "id": "bind_map",
+      "text": "Bind a familiar you find on the map",
+      "kind": "binds",
+      "n": 1,
+      "go": "nearby",
+      "reward": {
+        "xp": 30,
+        "gold": 40
+      }
+    },
+    {
+      "id": "shrine",
+      "text": "Draw on a shrine",
+      "kind": "shrines",
+      "n": 1,
+      "go": "nearby",
+      "reward": {
+        "xp": 20,
+        "gold": 20,
+        "materials": {
+          "ore": 2
+        }
+      }
+    },
+    {
+      "id": "skirmish",
+      "text": "Clear the Wild Skirmish",
+      "kind": "rift",
+      "rift": "skirmish",
+      "n": 1,
+      "go": "battle",
+      "reward": {
+        "xp": 40,
+        "gold": 50
+      }
+    },
+    {
+      "id": "level3",
+      "text": "Reach wizard level 3",
+      "kind": "level",
+      "n": 3,
+      "go": "battle",
+      "reward": {
+        "essence": 10
+      }
+    },
+    {
+      "id": "craft",
+      "text": "Forge a piece of gear",
+      "kind": "gear",
+      "n": 1,
+      "go": "home",
+      "reward": {
+        "xp": 30,
+        "materials": {
+          "runeFragments": 2
+        }
+      }
+    },
+    {
+      "id": "shallow",
+      "text": "Clear the Shallow Rift",
+      "kind": "rift",
+      "rift": "rift_shallow",
+      "n": 1,
+      "go": "battle",
+      "reward": {
+        "xp": 60,
+        "gold": 80
+      }
+    },
+    {
+      "id": "species5",
+      "text": "Own 5 kinds of familiar",
+      "kind": "species",
+      "n": 5,
+      "go": "nearby",
+      "reward": {
+        "essence": 15
+      }
+    },
+    {
+      "id": "ascend",
+      "text": "Ascend a familiar",
+      "kind": "ascend",
+      "n": 1,
+      "go": "journal",
+      "reward": {
+        "xp": 80,
+        "materials": {
+          "arcaneStone": 2
+        }
+      }
+    },
+    {
+      "id": "godfall",
+      "text": "Defeat the Evil God in the Godfall Rift",
+      "kind": "rift",
+      "rift": "rift_godfall",
+      "n": 1,
+      "go": "battle",
+      "reward": {
+        "xp": 200,
+        "gold": 300,
+        "essence": 30
+      }
+    }
+  ]
 }

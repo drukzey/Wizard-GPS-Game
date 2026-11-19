@@ -47,11 +47,20 @@ export function buildHub() {
   hub.motes = new THREE.Points(geo, new THREE.PointsMaterial({ color: 0xffb070, size: 0.05, transparent: true, opacity: 0.7, depthWrite: false }));
   s.add(hub.motes);
   hub.wizard = D.instance('mage');
-  if (hub.wizard) { hub.wizard.position.set(-0.3, 0, 0.6); plat.add(hub.wizard); hub.hand = findBone(hub.wizard, /hand_r$/i); hub.wizard.userData.anim?.setLoco({ idle: 0.35, stance: 0.65 }); }
+  if (hub.wizard) { plat.add(hub.wizard); hub.hand = findBone(hub.wizard, /hand_r$/i); hub.wizard.userData.anim?.setLoco({ idle: 1 }); } // centred, so turning the platform turns the wizard in place
 }
 const findBone = (root, re) => { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; };
 
-export const STAFF_LEN = 1.7, STAFF_ROT = new THREE.Euler(0, 0, -Math.PI / 2), STAFF_GRIP = 0.55;
+// How a staff sits in the old Synty rig's right hand (tuned by eye; the hand's local X runs along the fingers).
+export const staffTune = { len: 1.75, rx: 0, ry: 0, rz: -Math.PI / 2, grip: 0.42, ox: 0, oy: 0, oz: 0, curl: 1.1 };
+/** Close the hand around the shaft: the animations don't drive finger bones, so they keep this pose. */
+function curlFingers(hand, amount) {
+  hand.traverse((b) => { if (!b.isBone || b === hand) return;
+    if (b.userData.q0) b.quaternion.copy(b.userData.q0); else b.userData.q0 = b.quaternion.clone();
+    const thumb = /thumb/i.test(b.name);
+    b.rotateOnAxis(new THREE.Vector3(0, 0, 1), (thumb ? 0.5 : 1) * amount * (thumb ? -0.6 : 1));
+  });
+}
 /** Put a weapon model in the wizard's right hand (shared with the battle visual). */
 export async function attachStaff(wizard, modelName) {
   const hand = findBone(wizard, /hand_r$/i); if (!hand) return null;
@@ -61,10 +70,11 @@ export async function attachStaff(wizard, modelName) {
   obj.userData.isStaff = true;
   wizard.updateMatrixWorld(true);
   const ws = new THREE.Vector3(); hand.getWorldScale(ws);
-  const box = new THREE.Box3().setFromObject(obj), len = Math.max(1e-3, box.max.y - box.min.y);
-  const k = STAFF_LEN / len / ws.x; obj.scale.setScalar(k);
-  obj.rotation.set(STAFF_ROT.x, STAFF_ROT.y, STAFF_ROT.z);
-  obj.position.set(0, 0, 0); obj.translateY(-STAFF_GRIP * k); // the hand closes a third of the way up the shaft
+  const T = staffTune, box = new THREE.Box3().setFromObject(obj), len = Math.max(1e-3, box.max.y - box.min.y);
+  const k = T.len / len / ws.x; obj.scale.setScalar(k);
+  obj.rotation.set(T.rx, T.ry, T.rz);
+  obj.position.set(T.ox / ws.x, T.oy / ws.x, T.oz / ws.x); obj.translateY(-(box.min.y + T.grip * len) * k); // grip point, measured up the shaft
+  curlFingers(hand, T.curl);
   hand.add(obj); return obj;
 }
 
@@ -73,10 +83,10 @@ export async function setHubLoadout(teamIds, weaponModel) {
   if (teamIds.join() === hub.teamIds.join()) return;
   hub.teamIds = [...teamIds];
   for (const g of hub.team) hub.platform.remove(g);
-  const spots = [[-2.4, -1.0, 0.45], [2.4, -1.0, -0.45], [1.2, -2.6, -0.2]];
+  const spots = [[-2.5, 0.2, 0.25], [0, -0.5, 0], [2.5, 0.2, -0.25]]; // a row across the platform, centred on the middle one
   hub.team = teamIds.map((fid, i) => {
     const f = D.cfg().familiars[fid], g = D.instance(f.model); if (!g) return null;
-    prepCreature(g, f.model, 0.85); g.position.set(spots[i][0], 0, spots[i][1]); g.rotation.y = spots[i][2];
+    prepCreature(g, f.model, 1); g.position.set(spots[i][0], 0, spots[i][1]); g.rotation.y = spots[i][2];
     g.userData.anim?.setLoco({ idle: 1 }); g.userData.phase = i * 1.3;
     hub.platform.add(g); return g;
   }).filter(Boolean);
@@ -91,10 +101,11 @@ export function renderHub(renderer, dt, t, layout) {
   // pull back so the whole platform fits in the part of the screen the sheet leaves free
   const free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
   const k = Math.min(2.8, 1.15 / Math.max(0.35, free));
-  if (hub.focus === 'wizard') { // the profile view: your wizard alone, close enough to see the staff and gear
-    const wz = hub.wizard ? hub.wizard.position : new THREE.Vector3();
-    c.position.set(wz.x, 1.5, wz.z + (portrait ? 5.6 : 4.4) * Math.min(1.8, k)); c.lookAt(wz.x, 1.05, wz.z);
-  } else { c.position.set(0, (portrait ? 2.6 : 2.2) * (0.6 + 0.4 * k), (portrait ? 10.5 : 8.2) * k); c.lookAt(0, 1.15, -0.6); }
+  if (hub.focus === 'wizard') { // the profile view: your wizard alone in the middle, close enough to see the staff
+    c.position.set(0, 1.45, (portrait ? 5.4 : 4.6) * Math.min(1.8, k)); c.lookAt(0, 1.0, 0);
+  } else { // the team: three familiars side by side, framed to fill the free part of the screen
+    c.position.set(0, 2.2, (portrait ? 11.5 : 8.6) * Math.min(2.2, k)); c.lookAt(0, 1.1, 0);
+  }
   c.clearViewOffset();
   if (layout.sheet) {
     if (portrait) c.setViewOffset(w, h, 0, h * layout.sheet * 0.5, w, h); // shift the scene up by half the sheet height
@@ -109,7 +120,7 @@ export function renderHub(renderer, dt, t, layout) {
   for (const g of hub.team) { g.userData.anim?.update(dt); creatureIdle(g, g.userData.model, t + g.userData.phase); }
   renderer.render(hub.scene, c);
 }
-export function setHubFocus(f) { hub.focus = f; for (const g of hub.team) g.visible = f !== 'wizard'; }
+export function setHubFocus(f) { hub.focus = f; for (const g of hub.team) g.visible = f !== 'wizard'; if (hub.wizard) hub.wizard.visible = f === 'wizard'; hub.yaw = 0; hub.yawV = 0; }
 export function spinHub(dx) { hub.yawV = dx * 3; hub.yaw += dx; }
 
 // ---------- Sanctuary plot ----------
@@ -123,12 +134,27 @@ export function buildHome(cfg) {
   home.cam = new THREE.PerspectiveCamera(36, 1, 0.5, 200);
   const S = cfg.sanctuary, size = S.grid * S.tile;
   home.root = new THREE.Group(); s.add(home.root);
-  const grass = new THREE.Mesh(new THREE.PlaneGeometry(size + 2, size + 2), new THREE.MeshLambertMaterial({ color: 0x46553f }));
-  grass.rotation.x = -Math.PI / 2; grass.receiveShadow = true; s.add(grass); home.ground = grass;
-  const wild = new THREE.Mesh(new THREE.CircleGeometry(80, 40), new THREE.MeshLambertMaterial({ color: 0x252e2a }));
-  wild.rotation.x = -Math.PI / 2; wild.position.y = -0.05; s.add(wild);
-  const edge = new THREE.Mesh(new THREE.RingGeometry(size * 0.72, size * 0.74, 64), new THREE.MeshBasicMaterial({ color: 0xd7b26b, transparent: true, opacity: 0.25 }));
-  edge.rotation.x = -Math.PI / 2; edge.position.y = 0.02; s.add(edge);
+  // A floating island above the clouds: grass top, a jagged rock underside, mist below and a dusk sky.
+  s.background = skyTexture(); s.fog = new THREE.Fog(0x2b2440, 70, 170);
+  const R = size * 0.78;
+  const top = new THREE.Mesh(new THREE.CircleGeometry(R, 56), new THREE.MeshLambertMaterial({ color: 0x4f6b3e }));
+  top.rotation.x = -Math.PI / 2; top.receiveShadow = true; s.add(top);
+  const rim = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 0.97, 1.4, 56, 1, true), new THREE.MeshLambertMaterial({ color: 0x5b4a38, side: THREE.DoubleSide }));
+  rim.position.y = -0.7; s.add(rim);
+  const under = new THREE.ConeGeometry(R * 0.97, R * 1.1, 28, 6);
+  const pa = under.attributes.position; for (let i = 0; i < pa.count; i++) { const y = pa.getY(i); if (y < R * 0.5) { const f = 1 + (Math.sin(i * 12.9898) * 43758.5453 % 1) * 0.18; pa.setX(i, pa.getX(i) * f); pa.setZ(i, pa.getZ(i) * f); } }
+  under.computeVertexNormals();
+  const rock = new THREE.Mesh(under, new THREE.MeshLambertMaterial({ color: 0x4a4250, flatShading: true }));
+  rock.rotation.x = Math.PI; rock.position.y = -1.4 - R * 0.55; s.add(rock);
+  home.ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ visible: false })); // the buildable plot, for picking
+  home.ground.rotation.x = -Math.PI / 2; s.add(home.ground);
+  const paths = new THREE.Group(); s.add(paths); // stone paths crossing the plot between the four buildings
+  for (const [w, d] of [[size * 0.9, 2.6], [2.6, size * 0.9]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color: 0x8a7e6a })); m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.receiveShadow = true; paths.add(m); }
+  const mist = new THREE.Group(); s.add(mist); home.mist = mist; // drifting cloud puffs below the island
+  const puff = cloudTexture();
+  for (let i = 0; i < 26; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: 0xc9b8e8, transparent: true, opacity: 0.55, depthWrite: false }));
+    const a = Math.random() * Math.PI * 2, r = R * (0.6 + Math.random() * 1.4); sp.position.set(Math.cos(a) * r, -8 - Math.random() * 14, Math.sin(a) * r); sp.scale.setScalar(18 + Math.random() * 18); mist.add(sp); }
+  home.scenery = new THREE.Group(); s.add(home.scenery); home.R = R;
   // tile grid, shown while placing decorations
   const pts = [];
   for (let i = 0; i <= S.grid; i++) { const v = -size / 2 + i * S.tile; pts.push(v, 0.03, -size / 2, v, 0.03, size / 2, -size / 2, 0.03, v, size / 2, 0.03, v); }
@@ -138,19 +164,48 @@ export function buildHome(cfg) {
   home.tileSel = new THREE.Mesh(new THREE.PlaneGeometry(S.tile * 0.92, S.tile * 0.92), new THREE.MeshBasicMaterial({ color: 0x7fd6a0, transparent: true, opacity: 0.45, depthWrite: false }));
   home.tileSel.rotation.x = -Math.PI / 2; home.tileSel.visible = false; s.add(home.tileSel);
 }
+function skyTexture() {
+  const c = document.createElement('canvas'); c.width = 4; c.height = 256; const x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#191433'); g.addColorStop(0.5, '#3d3866'); g.addColorStop(0.8, '#a06f6a'); g.addColorStop(1, '#d7a46d'); x.fillStyle = g; x.fillRect(0, 0, 4, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+function cloudTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
+  for (let i = 0; i < 7; i++) { const cx = 30 + Math.random() * 68, cy = 40 + Math.random() * 48, r = 22 + Math.random() * 20, g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
+    g.addColorStop(0, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
+  return new THREE.CanvasTexture(c);
+}
+/** Trees, rocks and bushes around the island's edge, outside the buildable grid (Fantasy Kingdom models). */
+export async function dressIsland(cfg) {
+  if (home.dressed) return; home.dressed = true;
+  const R = home.R, place = async (name, n, r0, r1, h0, h1) => {
+    for (let i = 0; i < n; i++) {
+      const m = await D.loadModel(name, true); if (!m) return;
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.3, r = r0 + Math.random() * (r1 - r0);
+      const b = new THREE.Box3().setFromObject(m), k = (h0 + Math.random() * (h1 - h0)) / Math.max(1e-3, b.max.y - b.min.y);
+      m.scale.setScalar(k); m.position.set(Math.cos(a) * r, -b.min.y * k, Math.sin(a) * r); m.rotation.y = Math.random() * 6.28;
+      m.traverse((o) => { if (o.isMesh) o.castShadow = true; }); home.scenery.add(m);
+    }
+  };
+  await place('pines', 9, R * 0.86, R * 0.95, 8, 12);
+  await place('tree', 7, R * 0.8, R * 0.92, 5, 7);
+  await place('rock1', 6, R * 0.9, R * 0.98, 1.2, 2.2);
+  await place('bush1', 10, R * 0.78, R * 0.95, 1, 1.6);
+  await place('df_brazier', 4, R * 0.74, R * 0.76, 2.2, 2.2);
+}
 export const tileCenter = (cfg, x, z) => { const S = cfg.sanctuary, o = -S.grid * S.tile / 2 + S.tile / 2; return new THREE.Vector3(o + x * S.tile, 0, o + z * S.tile); };
 
-function fit(obj, maxSide) { // scale a building to fit its footprint, ground it, centre it
+function fit(obj, maxSide, sink = 0) { // scale a building to fit its footprint, ground it, centre it
   obj.updateMatrixWorld(true);
   const box = new THREE.Box3().setFromObject(obj), sz = box.getSize(new THREE.Vector3());
   const k = maxSide / Math.max(sz.x, sz.z, 0.01); obj.scale.multiplyScalar(k);
   obj.updateMatrixWorld(true); box.setFromObject(obj); const c = box.getCenter(new THREE.Vector3());
-  obj.position.x -= c.x; obj.position.z -= c.z; obj.position.y -= box.min.y;
+  obj.position.x -= c.x; obj.position.z -= c.z; obj.position.y -= box.min.y + sink * sz.y * k;
   const g = new THREE.Group(); g.add(obj); return g;
 }
 /** Rebuild whatever changed since the last call (facility levels, decor list). */
 export async function syncHome(cfg, h) {
-  const S = cfg.sanctuary;
+  const S = cfg.sanctuary; dressIsland(cfg);
   for (const [id, f] of Object.entries(S.facilities)) {
     const model = f.models[h.facilities[id] - 1];
     if (home.facilities[id]?.userData.model === model) continue;

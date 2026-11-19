@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=20';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=20';
-import * as Col from './collection.js?v=20';
-import * as P from './progression.js?v=20';
-import * as S from './sanctuary.js?v=20';
-import * as Stage from './stage.js?v=20';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=20';
-import * as World from './world.js?v=20';
+import { createSim } from './sim.js?v=21';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=21';
+import * as Col from './collection.js?v=21';
+import * as P from './progression.js?v=21';
+import * as S from './sanctuary.js?v=21';
+import * as Stage from './stage.js?v=21';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=21';
+import * as World from './world.js?v=21';
 
 const $ = (id) => document.getElementById(id);
-const VER = 20; // cache-busting version, kept in step by stamp.py
+const VER = 21; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -75,7 +75,8 @@ const UI_SPRITES = ['orbL', 'orbR', 'orbGlass', 'orbSheen', 'ring', 'ringBg', 'b
   'i_abl_retaliation_circle', 'i_abl_stone_skin', 'i_abl_serpent_dash', 'i_abl_gust', 'i_abl_ink_pool',
   'f_panel', 'f_wide', 'f_card', 'f_card2', 'f_btn', 'f_tab', 'f_btn2', 'f_ring', 'f_diamond', 'f_bar', 'f_brackets', 'f_crest', 'f_line',
   'n_play', 'n_journal', 'n_wizard', 'n_home', 'n_map', 'n_settings', 'n_scroll', 'n_medal', 'c_gold', 'c_essence', 'm_rune', 'm_stone', 'm_ore', 'chest',
-  's_weapon', 's_robe', 's_boots', 's_amulet', 's_ring', 'n_craft', 'n_research', 'n_forge', 'n_dwelling', 'n_chamber', 'n_library', 'n_lock'];
+  's_weapon', 's_robe', 's_boots', 's_amulet', 's_ring', 'n_craft', 'n_research', 'n_forge', 'n_dwelling', 'n_chamber', 'n_library', 'n_lock',
+  'g_bar', 'g_card', 'g_wide', 'g_archbg', 'g_arch', 'g_row', 'g_slot', 'g_goal', 'g_obj_on', 'g_obj_off', 'g_parch', 'g_tip', 'g_close', 'g_notice', 'g_flag', 'g_tog_bg', 'g_tog_l', 'g_tog_r', 'g_fill', 'g_glow'];
 const assets = { atlas: {}, models: {}, tex: {}, lib: null };
 const uiSrc = {}, spriteUrl = (k) => uiSrc[k] || '';
 
@@ -120,7 +121,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=20`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=21`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -129,7 +130,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=20')).default, ...(await import('./pub/anims_m5.js?v=20')).default };
+    const packed = { ...(await import('./pub/anims.js?v=21')).default, ...(await import('./pub/anims_m5.js?v=21')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -138,7 +139,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=20')).default, ...(await import('./pub/models_m4.js?v=20')).default };
+  const models = { ...(await import('./pub/models.js?v=21')).default, ...(await import('./pub/models_m4.js?v=21')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -160,10 +161,12 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=20')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=21')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
-      obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
+      const df = name.startsWith('df_'); // Dark Fantasy pieces use their own atlas, and their fire and runes glow
+      if (df && !assets.dfGlow) assets.dfGlow = await loadTexture('assets/darkfantasy_emissive.jpg').catch(() => null);
+      obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial(df ? { map: assets.atlas.darkfantasy, emissiveMap: assets.dfGlow, emissive: assets.dfGlow ? 0xffffff : 0x000000, emissiveIntensity: 1.6 } : { map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
       return obj;
     } catch (err) { console.warn('[model]', name, err); return null; }
   })();
@@ -199,7 +202,7 @@ function makePortraits() {
     const g = instance(key); if (!g) return null;
     sc.add(g); g.rotation.y = face ? 0 : 0.45;
     const box = new THREE.Box3().setFromObject(g), h = box.max.y - box.min.y;
-    if (face) { camP.position.set(0, h * 0.86, h * 0.62); camP.lookAt(0, h * 0.83, 0); }
+    if (face) { camP.position.set(0, h * 0.8, h * 1.05); camP.lookAt(0, h * 0.76, 0); } // head and shoulders
     else { camP.position.set(0, h * 0.55, h * 2.05); camP.lookAt(0, h * 0.48, 0); }
     r.render(sc, camP); sc.remove(g); return r.domElement.toDataURL('image/png');
   };
@@ -673,6 +676,39 @@ function renderAvatar() {
   const L = P.levelInfo(cfg, prof.xp);
   $('lvT').textContent = L.level; $('xpRing').style.setProperty('--xp', `${L.need ? Math.round((100 * L.into) / L.need) : 100}%`);
   if (portraits.mage) $('avatarImg').src = portraits.mage;
+  renderGoals();
+}
+// ----- goals: one objective at a time on the map, the full list in the Journal -----
+const goalCtx = () => ({ binds: prof.stats.binds || 0, shrines: prof.stats.shrines || 0, rifts: prof.stats.rifts || {}, level: P.levelInfo(cfg, prof.xp).level,
+  gear: home ? home.items.length : 0, species: Object.keys(col.owned).length, ascended: Object.values(col.owned).filter((o) => (o.ascension || 0) > 0).length });
+function goGoal(g) {
+  if (g.go === 'nearby') { $('nearbyPanel').hidden = false; renderNearby(); } else toggleMenu(true, g.go);
+}
+function claimGoal(g) {
+  const r = P.grant(cfg, prof, `goal:${g.id}`, { mastery: {}, ...g.reward });
+  if (!prof.goals.includes(g.id)) prof.goals.push(g.id);
+  saveProf(); toast(`Goal complete: ${g.text}`, 'var(--brass)');
+  if (r.applied && r.wizard.to > r.wizard.from) toast(`Wizard level ${r.wizard.to}`, 'var(--brass)');
+  renderAvatar(); if (!$('menu').hidden) { renderWallet(); if (campTab === 'journal') renderJournal(); }
+}
+function renderGoals() {
+  if (!col || !prof) return;
+  const g = P.currentGoal(cfg, prof.goals), card = $('goalCard');
+  card.hidden = !g; if (!g) return;
+  const pr = P.goalProgress(g, goalCtx());
+  card.classList.toggle('done', pr.done);
+  $('goalHead').textContent = pr.done ? 'Goal complete' : `Goal ${cfg.goals.indexOf(g) + 1} of ${cfg.goals.length}`;
+  $('goalText').textContent = g.text;
+  $('goalFill').style.width = `${Math.round((100 * pr.have) / g.n)}%`;
+  $('goalGo').textContent = pr.done ? 'Claim' : 'Go';
+  card.onclick = () => (pr.done ? claimGoal(g) : goGoal(g));
+}
+function goalListHtml() {
+  const ctx = goalCtx();
+  return cfg.goals.map((g, i) => {
+    const pr = P.goalProgress(g, ctx), claimed = prof.goals.includes(g.id);
+    return `<div class="goalRow${claimed ? ' claimed' : pr.done ? ' done' : ''}"><span class="gIcon"></span><div class="grow"><b>${g.text}</b><div class="s">${claimed ? 'Claimed' : `${pr.have} of ${g.n}`}</div></div><div class="cost">${rewardHtml(g.reward)}</div></div>`;
+  }).join('');
 }
 function renderWallet() {
   const L = P.levelInfo(cfg, prof.xp);
@@ -738,11 +774,12 @@ $('nearbyClose').onclick = () => { $('nearbyPanel').hidden = true; };
 const unknownSpecies = (fid) => !col.owned[fid] && !col.seen[fid];
 const faceImg = (fid) => `<img src="${portraits[fid] || ''}" alt=""${unknownSpecies(fid) ? ' class="unknown"' : ''}>`;
 function renderNearbyButton() {
-  const { spawns } = nearbyState(), wild = col.encounters.filter((e) => e.state === 'open');
+  const { spawns, sites, shrines } = nearbyState(), wild = col.encounters.filter((e) => e.state === 'open');
   const faces = [...spawns.map((s) => s.familiarId), ...wild.map((e) => e.familiarId)].slice(0, 3);
-  $('nearFaces').innerHTML = faces.map(faceImg).join('');
-  const n = spawns.length + wild.length;
-  $('nearCount').textContent = n ? `${n} nearby` : 'Nearby';
+  $('nearFaces').innerHTML = [0, 1, 2].map((i) => `<span class="slot">${faces[i] ? faceImg(faces[i]) : ''}</span>`).join('');
+  const n = spawns.length + wild.length, places = (sites || []).length + (shrines || []).length;
+  $('nearCount').textContent = n ? `${n} ${n === 1 ? 'familiar' : 'familiars'}` : places ? `${places} places` : 'Look around';
+  $('nearbyBtn').classList.toggle('has', n > 0);
 }
 function renderNearby() {
   renderNearbyButton();
@@ -761,6 +798,13 @@ function renderNearby() {
     const rf = cfg.rifts.find((x) => x.id === s.riftId);
     row(`<img src="${spriteUrl('n_play')}" alt="" style="background:#2a1210;padding:8px"><span class="grow"><b>${rf.name}</b><span class="s">${Math.round(s.distance)} m · portal bonus</span></span>`, '#c8463a', () => { flyTo(s); $('nearbyPanel').hidden = true; });
   }
+  const shrines = (nearbyState().shrines || []).slice(0, 3);
+  if (shrines.length) head('Shrines');
+  for (const s of shrines) {
+    const t = cfg.shrines.types[s.type], ready = !prof.processed.includes(World.shrineVisit(cfg, s, Date.now()).txId);
+    row(`<img src="${spriteUrl('g_glow')}" alt="" style="background:#1d1830;padding:6px"><span class="grow"><b>${s.name || t.name}</b><span class="s">${t.name} · ${Math.round(s.distance)} m</span></span>${ready ? '<span class="tag" style="--c:var(--brass)">Ready</span>' : ''}`,
+      t.glow, () => { flyTo(s); $('nearbyPanel').hidden = true; });
+  }
   const wild = col.encounters.filter((e) => e.state === 'open');
   head('Sightings <span class="comp">bind from anywhere</span>');
   if (!wild.length) list.insertAdjacentHTML('beforeend', `<p class="s">Sightings turn up every few minutes and when you clear battle waves.</p>`);
@@ -776,6 +820,7 @@ function renderExplore() { renderNearby(); }
 let pendingRift = null;
 function openRift(rift, distance) {
   pendingRift = { rift, portal: distance === null };
+  $('riftGo').textContent = 'Enter rift'; $('riftGo').hidden = false;
   const c = rift.clearReward, lvl = P.levelInfo(cfg, prof.xp).level, locked = lvl < rift.minLevel;
   $('riftBody').innerHTML = `<h1 style="font-size:32px">${rift.name}</h1><p>${rift.desc}</p>
     <div class="tags">${rift.modifiers.map((m) => `<span class="tag" style="--c:var(--brass)">${cfg.riftModifiers[m].name}: ${cfg.riftModifiers[m].desc.toLowerCase()}</span>`).join('')}</div>
@@ -786,7 +831,23 @@ function openRift(rift, distance) {
 }
 const scaleReward = (c, k) => ({ ...c, xp: Math.round(c.xp * k), gold: Math.round(c.gold * k), essence: Math.round(c.essence * k), materials: Object.fromEntries(Object.entries(c.materials || {}).map(([m, v]) => [m, Math.round(v * k)])) });
 $('riftClose').onclick = () => { $('riftOv').hidden = true; };
-$('riftGo').onclick = () => { $('riftOv').hidden = true; startBattle(pendingRift.rift, pendingRift.portal); toggleMenu(false); };
+$('riftGo').onclick = () => { $('riftOv').hidden = true; if (pendingRift.shrine) return; startBattle(pendingRift.rift, pendingRift.portal); toggleMenu(false); };
+
+// ----- shrines: walk up and tap for materials, once per cooldown window -----
+function visitShrine(site, distance) {
+  const t = cfg.shrines.types[site.type], v = World.shrineVisit(cfg, site, Date.now());
+  pendingRift = { shrine: true };
+  let note = '';
+  if (distance !== null) note = `<p class="s">The shrine is ${distance} m away. Walk within ${cfg.shrines.radiusM} m to draw on it.</p><div class="cost">${rewardHtml(v.reward)}</div>`;
+  else if (prof.processed.includes(v.txId)) note = `<p class="s">Already drawn on. It recharges in ${fmtTime(v.readyAt - Date.now())}.</p>`;
+  else {
+    const g = P.grant(cfg, prof, v.txId, v.reward);
+    if (g.applied) { prof.stats.shrines = (prof.stats.shrines || 0) + 1; saveProf(); renderAvatar(); }
+    note = `<p class="s">The shrine answers. It recharges in ${fmtTime(v.readyAt - Date.now())}.</p><div class="cost">${rewardHtml(v.reward)}</div>${g.wizard && g.wizard.to > g.wizard.from ? `<p class="lvl">Wizard level ${g.wizard.to}</p>` : ''}`;
+  }
+  $('riftBody').innerHTML = `<h1 style="font-size:32px;color:${t.glow}">${site.name || t.name}</h1>${site.name ? `<p class="s">${t.name}</p>` : ''}<p>${t.desc}</p>${note}`;
+  $('riftGo').hidden = true; $('riftOv').hidden = false;
+}
 
 // ----- Play -----
 function renderPlay() {
@@ -832,8 +893,8 @@ function renderWizard() {
 function renderTeam() {
   $('teamSlots').innerHTML = [0, 1, 2].map((i) => {
     const fid = loadout[i], f = fid && cfg.familiars[fid];
-    return f ? `<button class="slotR" data-i="${i}" style="--c:${css(f.type)}" aria-label="Remove ${f.name}">${portraitImg(fid)}<i class="abBadge">${icon(`i_${f.abilityId}`, css(f.type))}</i><small>${f.name}</small></button>`
-      : `<button class="slotR empty" data-i="${i}" aria-label="Empty slot">${icon('i_arcane', '#666')}<small>Empty</small></button>`;
+    return f ? `<button class="fcard slot" data-i="${i}" style="--c:${css(f.type)}" aria-label="Remove ${f.name}"><span class="fpic">${portraitImg(fid)}<i class="abBadge">${icon(`i_${f.abilityId}`, css(f.type))}</i></span><b>${f.name}</b><small>${cfg.abilities[f.abilityId].name}</small><span class="n">${i + 1}</span></button>`
+      : `<button class="fcard slot empty" data-i="${i}" aria-label="Empty slot"><span class="fpic">${icon('i_arcane', '#666')}</span><b>Empty</b><small>Pick below</small></button>`;
   }).join('');
   for (const b of $('teamSlots').children) b.onclick = () => { const fid = loadout[+b.dataset.i]; if (fid) { loadout.splice(+b.dataset.i, 1); teamChanged(); } };
   const letters = { arcane: 'Arcane', runic: 'Runic', ancient: 'Ancient' };
@@ -843,9 +904,9 @@ function renderTeam() {
   for (const [fid, f] of Object.entries(cfg.familiars)) {
     if (!col.owned[fid]) continue;
     const i = loadout.indexOf(fid), ab = P.effectiveAbility(cfg, col, prof, fid), mi = P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0);
-    const b = document.createElement('button'); b.className = `pick${i >= 0 ? ' sel' : ''}`; b.style.setProperty('--c', css(f.type));
+    const b = document.createElement('button'); b.className = `fcard${i >= 0 ? ' sel' : ''}`; b.style.setProperty('--c', css(f.type)); b.style.setProperty('--rc', rarityCfg(f.rarity).color);
     b.setAttribute('aria-pressed', i >= 0);
-    b.innerHTML = `${famFace(fid)}<div><b>${f.name}</b><span>${ab.name} · Mastery ${mi.level}</span></div>${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}`;
+    b.innerHTML = `<span class="fpic">${portraitImg(fid)}<i class="abBadge">${icon(`i_${f.abilityId}`, css(f.type))}</i></span><b>${f.name}</b><small>${ab.name}</small><small class="m">Mastery ${mi.level}</small>${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}`;
     b.onclick = () => { if (i >= 0) loadout.splice(i, 1); else if (loadout.length < 3) loadout.push(fid); else { loadout[2] = fid; } teamChanged(); };
     grid.appendChild(b);
   }
@@ -1028,6 +1089,7 @@ function renderJournal() {
   if (!col) return;
   const ids = Object.keys(cfg.familiars), owned = ids.filter((f) => col.owned[f]);
   $('colT').textContent = `${owned.length} of ${ids.length} bound`;
+  $('goalList').innerHTML = goalListHtml();
   $('journal').innerHTML = ids.map((fid) => {
     const f = cfg.familiars[fid], o = col.owned[fid], seen = col.seen[fid], r = rarityCfg(f.rarity), ab = cfg.abilities[f.abilityId];
     if (!o && !seen) return `<div class="jc unknown">${famFace(fid, true)}<div><div class="t">Undiscovered</div><div class="s">Keep exploring.</div></div></div>`;
@@ -1296,7 +1358,7 @@ function finishBinding() {
   bind.quality = []; bind.misses = 0;
   const pct = Math.round((res.chance || 0) * 100);
   if (res.outcome === 'bound') {
-    const rw = P.bindingRewards(cfg, res), g = P.grant(cfg, prof, `bind:${bind.enc.id}`, rw); saveProf();
+    const rw = P.bindingRewards(cfg, res), g = P.grant(cfg, prof, `bind:${bind.enc.id}`, rw); if (g.applied) prof.stats.binds = (prof.stats.binds || 0) + 1; saveProf();
     $('bind').hidden = true; showReveal(res, g.applied ? rw : null);
   }
   else if (res.outcome === 'resisted') {
@@ -1426,7 +1488,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=20')).json();
+    cfg = await (await fetch('data/config.json?v=21')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
@@ -1441,7 +1503,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
     renderLegend();
     setInterval(tickWilds, 1000);
     initWorld({ cfg, col: () => col, saveCol, rarityCfg, icon, css, toast, openBinding,
-      store, instance, loadModel, attachStaff: Stage.attachStaff, staffModel: () => weaponModel(), creatureIdle: Stage.creatureIdle, openRift, onNearby: renderNearby });
+      store, instance, loadModel, attachStaff: Stage.attachStaff, staffModel: () => weaponModel(), creatureIdle: Stage.creatureIdle, openRift, visitShrine, onNearby: renderNearby });
     await Stage.setHubLoadout(loadout, weaponModel());
     $('loading').remove();
     makePortraits(); renderAvatar(); renderNearbyButton();

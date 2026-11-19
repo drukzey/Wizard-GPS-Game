@@ -1,7 +1,7 @@
 // Tomecraft GPS overworld rules (M6 alpha): map cells, deterministic spawns, range and speed checks.
 // Pure logic. Spawns come from a hash of (cell, time window), so everyone in the same place sees the same
 // familiars without a server, and nothing about the player's location leaves the device.
-import { rollSpecies, rngFrom } from './collection.js?v=20';
+import { rollSpecies, rngFrom } from './collection.js?v=21';
 
 const R_EARTH = 6371000;
 export function distanceM(a, b) {
@@ -96,3 +96,31 @@ export function riftSites(cfg, pos, radiusM) {
   return out.sort((a, b) => a.distance - b.distance);
 }
 export const riftInRange = (cfg, pos, site, acc = 0) => distanceM(pos, site) - Math.min(acc, cfg.world.accuracyAllowanceM) <= cfg.world.riftRadiusM;
+
+/** Shrines (GDD §11 "magical shrines"): one per shrine cell, the same for everyone. Where the map knows a real point of
+ *  interest in the cell, the shrine stands on it; otherwise it sits at a fixed spot, so rural players get shrines too. */
+export function shrineSites(cfg, pos, radiusM, pois = []) {
+  const S = cfg.shrines, W = { ...cfg.world, cellM: S.cellM }, c = cellOf(W, pos.lat, pos.lon), types = Object.keys(S.types);
+  const reach = Math.ceil(radiusM / W.cellM) + 1, out = [];
+  for (let dy = -reach; dy <= reach; dy++) {
+    const cy = c.cy + dy, lonStep = lonStepForRow(W, cy, c.latStep), cx0 = Math.floor(pos.lon / lonStep);
+    for (let dx = -reach; dx <= reach; dx++) {
+      const cx = cx0 + dx, rng = rngFrom(hash(W.seed, 'shrine', cx, cy));
+      if (rng() < S.emptyCellChance) continue;
+      const inCell = pois.filter((p) => Math.floor(p.lat / c.latStep) === cy && Math.floor(p.lon / lonStep) === cx).sort((a, b) => String(a.id).localeCompare(String(b.id)));
+      const at = inCell[0] || { lat: (cy + 0.15 + rng() * 0.7) * c.latStep, lon: (cx + 0.15 + rng() * 0.7) * lonStep };
+      const site = { id: `s:${cx}:${cy}`, type: types[Math.floor(rng() * types.length)], lat: at.lat, lon: at.lon, name: inCell[0]?.name || null };
+      site.distance = distanceM(pos, site);
+      if (site.distance <= radiusM) out.push(site);
+    }
+  }
+  return out.sort((a, b) => a.distance - b.distance);
+}
+/** What a shrine gives this visit. Each shrine can be used once per cooldown window; the window number makes the reward idempotent. */
+export function shrineVisit(cfg, site, now) {
+  const S = cfg.shrines, t = S.types[site.type], win = Math.floor(now / (S.cooldownMin * 60000));
+  const rng = rngFrom(hash(cfg.world.seed, site.id, win));
+  const reward = { xp: S.xp, gold: S.gold[0] + Math.floor(rng() * (S.gold[1] - S.gold[0] + 1)), essence: t.essence || 0, mastery: {}, materials: {} };
+  for (const [m, [a, b]] of Object.entries(t.materials || {})) reward.materials[m] = a + Math.floor(rng() * (b - a + 1));
+  return { txId: `shrine:${site.id}:${win}`, reward, readyAt: (win + 1) * S.cooldownMin * 60000 };
+}

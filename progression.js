@@ -7,7 +7,7 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 
 export function newProfile(cfg) {
   return { version: PROFILE_VERSION, xp: 0, gold: 0, essence: 0, materials: Object.fromEntries(Object.keys(cfg.materials || {}).map((k) => [k, 0])), processed: [], familiars: {},
-    presets: Array(cfg.progression.presets).fill(null), stats: { battles: 0, bestWave: 0, kills: 0 } };
+    presets: Array(cfg.progression.presets).fill(null), stats: { battles: 0, bestWave: 0, kills: 0 }, goals: [] };
 }
 export function loadProfile(cfg, raw) {
   const p = newProfile(cfg);
@@ -21,6 +21,7 @@ export function loadProfile(cfg, raw) {
   }
   (raw.presets || []).slice(0, p.presets.length).forEach((x, i) => { if (Array.isArray(x) && x.length === 3 && x.every((f) => cfg.familiars[f])) p.presets[i] = [...x]; });
   Object.assign(p.stats, raw.stats || {});
+  p.goals = (raw.goals || []).filter((id) => (cfg.goals || []).some((g) => g.id === id));
   return p;
 }
 export function addMats(into, add) { for (const [k, v] of Object.entries(add || {})) if (v) into[k] = (into[k] || 0) + v; return into; }
@@ -142,3 +143,12 @@ export function savePreset(cfg, p, i, ids) {
   if (i < 0 || i >= p.presets.length || ids.length !== 3 || !ids.every((f) => cfg.familiars[f])) return false;
   p.presets[i] = [...ids]; return true;
 }
+
+// ---- goals: a fixed list, claimed in order; progress is read from existing state ----
+/** ctx: { binds, shrines, rifts:{id:n}, level, gear, species, ascended } */
+export function goalProgress(g, ctx) {
+  const have = g.kind === 'rift' ? (ctx.rifts[g.rift] || 0) : (ctx[g.kind === 'ascend' ? 'ascended' : g.kind] || 0);
+  return { have: Math.min(have, g.n), done: have >= g.n };
+}
+/** The first goal not yet claimed, or null when all are claimed. */
+export const currentGoal = (cfg, claimed) => cfg.goals.find((g) => !claimed.includes(g.id)) || null;

@@ -112,7 +112,31 @@ UI_M5 = {  # name: (file in ui_m5, max size). Frames are used as CSS border-imag
     'n_library': ('ICON_DarkFantasy_Map_Quest_01_Clean.png', 96), 'n_lock': ('ICON_DarkFantasy_Map_Lock_01_Clean.png', 96),
 }
 
-if __name__ == '__main__' and sys.argv[1:] == ['m5']:  # M5 only: python3 -I build.py m5
+DF = f'{UP}/POLYGON_Dark_Fantasy_SourceFiles_v4/FBX'
+MODELS_M6 = {'df_brazier': f'{DF}/Props/SM_Prop_Brazier_01.fbx', 'df_gargoyle': f'{DF}/Props/SM_Prop_Gargoyle_Statue_01.fbx', 'df_statue': f'{DF}/Props/SM_Prop_Statue_01.fbx',
+  'df_torch': f'{DF}/Props/SM_Prop_Torch_01.fbx', 'df_ruin1': f'{DF}/Buildings/SM_Bld_Ruin_01.fbx', 'df_ruin2': f'{DF}/Buildings/SM_Bld_Ruin_02.fbx', 'df_ruin3': f'{DF}/Buildings/SM_Bld_Ruin_03.fbx',
+  'angel': f'{K}/SM_Prop_Statue_Angel_01.fbx', 'crystal3': f'{K}/SM_Item_Crystal_03.fbx', 'rock1': f'{K}/SM_Env_Rock_01.fbx', 'rock2': f'{K}/SM_Env_Rock_02.fbx', 'rock3': f'{K}/SM_Env_Rock_03.fbx',
+  'bush1': f'{K}/SM_Env_Bush_01.fbx', 'bush3': f'{K}/SM_Env_Bush_03.fbx', 'tuft': f'{K}/SM_Env_Grass_Tuft_01.fbx', 'path': f'{K}/SM_Env_Path_Brick_Group_01.fbx', 'fence': f'{K}/SM_Prop_Fence_01.fbx',
+  'pines': f'{K}/SM_Env_Tree_Pine_Cluster_01.fbx'}
+SS = f'{UP}/Source_Sprites/Sprites'; MM = f'{UP}/INTERFACE_Dark_Fantasy_Menus_SourceFiles_v1/Sprites'
+UI_M6 = {'g_bar': (f'{SS}/DarkFantasy/SPR_DarkFantasy_Frame_Bar_02.png', 512), 'g_card': (f'{SS}/DarkFantasy/SPR_DarkFantasy_Frame_Box_Medium_16.png', 256),
+  'g_wide': (f'{SS}/DarkFantasy/SPR_DarkFantasy_Frame_Box_Medium_21.png', 512), 'g_archbg': (f'{SS}/DarkFantasy/SPR_DarkFantasy_Frame_Arch_Medium_02_Background.png', 256),
+  'g_arch': (f'{SS}/DarkFantasy/SPR_DarkFantasy_Frame_Arch_Medium_02_Variant_01.png', 256), 'g_row': (f'{SS}/DarkFantasy/SPR_DarkFantasy_Frame_Hotbar_07.png', 512),
+  'g_slot': (f'{SS}/DarkFantasy/SPR_DarkFantasy_Frame_Hotbar_08.png', 256), 'g_goal': (f'{SS}/HUD/SPR_DarkFantasy_Map_Worldspace_Objective_01_Clean.png', 128),
+  'g_obj_on': (f'{SS}/HUD/SPR_HUD_DarkFantasy_Objective_Active_01_Clean.png', 96), 'g_obj_off': (f'{SS}/HUD/SPR_HUD_DarkFantasy_Objective_Inactive_01_Clean.png', 96),
+  'g_parch': (f'{SS}/HUD/SPR_HUD_DarkFantasy_Box_Medium_Parchment_01.png', 256), 'g_tip': (f'{SS}/HUD/SPR_HUD_DarkFantasy_Tooltip_01.png', 96),
+  'g_close': (f'{SS}/HUD/SPR_HUD_DarkFantasy_Close_01_Clean.png', 96), 'g_notice': (f'{MM}/DarkFantasyMenus/SPR_DarkFantasyMenus_PushNotification_01.png', 96),
+  'g_flag': (f'{MM}/DarkFantasyMenus/SPR_DarkFantasyMenus_Flag_02.png', 256), 'g_tog_bg': (f'{MM}/DarkFantasyMenus/SPR_DarkFantasyMenus_Button_Toggle_03_Background.png', 256),
+  'g_tog_l': (f'{MM}/DarkFantasyMenus/SPR_DarkFantasyMenus_Button_Toggle_03_Left.png', 256), 'g_tog_r': (f'{MM}/DarkFantasyMenus/SPR_DarkFantasyMenus_Button_Toggle_03_Right.png', 256),
+  'g_fill': (f'{MM}/DarkFantasyMenus/SPR_DarkFantasyMenus_Frame_Bar_Medium_02_Background.png', 512), 'g_glow': (f'{MM}/FX/SPR_DarkFantasyMenus_FX_Glow_01.png', 128)}
+
+if __name__ == '__main__' and sys.argv[1:] == ['m6']:  # map scenery, island and extra HUD sprites: python3 -I build.py m6
+    print('sanct/* m6', sum(pack({k: v}, f'sanct/{k}.js') for k, v in MODELS_M6.items()))
+    ui = os.path.join(HERE, 'ui')
+    for k, (p, m) in UI_M6.items():
+        im = Image.open(p).convert('RGBA'); im.thumbnail((m, m), Image.LANCZOS); im.save(os.path.join(ui, f'{k}.png'), optimize=True)
+    print('ui m6', len(UI_M6))
+elif __name__ == '__main__' and sys.argv[1:] == ['m5']:  # M5 only: python3 -I build.py m5
     os.makedirs(os.path.join(OUT, 'sanct'), exist_ok=True)  # one file per model so the Sanctuary loads only what it shows
     print('sanct/*', sum(pack({k: v}, f'sanct/{k}.js') for k, v in MODELS_SANCTUARY.items()))
     print('gear.js', pack(MODELS_GEAR, 'gear.js'))
