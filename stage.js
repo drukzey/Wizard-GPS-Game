@@ -143,8 +143,8 @@ export function buildHome(cfg) {
   home.ground.rotation.x = -Math.PI / 2; s.add(home.ground);
   const mist = new THREE.Group(); s.add(mist); home.mist = mist; // drifting cloud puffs below the island
   const puff = cloudTexture();
-  for (let i = 0; i < 26; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: 0xc9b8e8, transparent: true, opacity: 0.55, depthWrite: false }));
-    const a = Math.random() * Math.PI * 2, r = R * (0.6 + Math.random() * 1.4); sp.position.set(Math.cos(a) * r, -8 - Math.random() * 14, Math.sin(a) * r); sp.scale.setScalar(18 + Math.random() * 18); mist.add(sp); }
+  for (let i = 0; i < 26; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: 0x8f80b8, transparent: true, opacity: 0.32, depthWrite: false }));
+    const a = Math.random() * Math.PI * 2, r = R * (0.6 + Math.random() * 1.4); sp.position.set(Math.cos(a) * r, -16 - Math.random() * 16, Math.sin(a) * r); sp.scale.setScalar(26 + Math.random() * 22); mist.add(sp); }
   home.scenery = new THREE.Group(); s.add(home.scenery); home.R = R;
   // tile grid, shown while placing decorations
   const pts = [];
@@ -163,25 +163,54 @@ function skyTexture() {
 function cloudTexture() {
   const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d');
   for (let i = 0; i < 7; i++) { const cx = 30 + Math.random() * 68, cy = 40 + Math.random() * 48, r = 22 + Math.random() * 20, g = x.createRadialGradient(cx, cy, 0, cx, cy, r);
-    g.addColorStop(0, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
+    g.addColorStop(0, 'rgba(255,255,255,.3)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
   return new THREE.CanvasTexture(c);
 }
 /** Load the Blender-built island once: vertex-coloured terrain and rock, a pond, and Synty Kingdom set dressing. */
+/** Ground shader for the island top: Blender stores grass/dirt/rock weights in the vertex colours (RGB);
+ *  here they blend Fantasy Kingdom ground textures, sampled in world space so there are no UV seams. */
+function groundMaterial() {
+  const L = new THREE.TextureLoader(), tex = (n) => { const t = L.load(`assets/ground_${n}.jpg?v=${D.ver || 1}`); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; };
+  const m = new THREE.MeshLambertMaterial({ vertexColors: true });
+  const u = { tG1: { value: tex('g1') }, tG2: { value: tex('g2') }, tG3: { value: tex('g3') }, tDirt: { value: tex('dirt') }, tRock: { value: tex('rock') } };
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, u);
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vW;').replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vW; uniform sampler2D tG1, tG2, tG3, tDirt, tRock;
+      float wav(vec2 p){ return 0.5 + 0.25 * sin(p.x * 0.11 + sin(p.y * 0.07) * 2.0) + 0.25 * sin(p.y * 0.13 + sin(p.x * 0.05) * 2.3); }`)
+      .replace('#include <color_fragment>', `
+        vec2 uv = vW.xz * 0.085; float n1 = smoothstep(0.35, 0.65, wav(vW.xz)), n2 = smoothstep(0.62, 0.8, wav(vW.zx * 1.7 + 40.0));
+        vec3 grass = mix(texture2D(tG1, uv).rgb, texture2D(tG2, uv * 0.9).rgb, n1); grass = mix(grass, texture2D(tG3, uv).rgb, n2 * 0.85);
+        vec3 dirt = texture2D(tDirt, uv * 1.3).rgb, rock = texture2D(tRock, uv * 0.7).rgb * vec3(0.62, 0.6, 0.62);
+        vec3 w = vColor.rgb / max(0.001, vColor.r + vColor.g + vColor.b);
+        diffuseColor.rgb *= grass * w.r + dirt * w.g + rock * w.b;`);
+  };
+  return m;
+}
 export async function dressIsland() {
   if (home.dressed) return; home.dressed = true;
   const isl = await D.loadModel('island', true); if (!isl) return;
-  const water = new THREE.MeshLambertMaterial({ color: 0x2a7a96, emissive: 0x0b3344, transparent: true, opacity: 0.85 });
-  const ground = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  const water = new THREE.MeshLambertMaterial({ color: 0x2f8aa6, emissive: 0x0c3a4c, transparent: true, opacity: 0.86 });
+  const rock = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true, side: THREE.DoubleSide });
+  const falls = new THREE.ShaderMaterial({ uniforms: { t: { value: 0 } }, transparent: true, depthWrite: false, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform float t; varying vec2 vUv; void main(){
+      float streak = 0.55 + 0.45 * sin(vUv.x * 40.0 + sin(vUv.x * 7.0) * 3.0) * sin((vUv.y * 9.0 - t * 2.2) + vUv.x * 5.0);
+      vec3 c = mix(vec3(0.25, 0.62, 0.74), vec3(0.85, 0.95, 1.0), streak * 0.6);
+      float edge = smoothstep(0.0, 0.18, vUv.x) * smoothstep(1.0, 0.82, vUv.x);
+      gl_FragColor = vec4(c, (0.55 + 0.3 * streak) * edge * (1.0 - smoothstep(0.55, 1.0, vUv.y))); }` });
+  const ground = groundMaterial();
   isl.traverse((o) => {
     if (!o.isMesh) return;
-    if (/water/i.test(o.name)) { o.material = water; o.receiveShadow = true; o.castShadow = false; home.water = o; }
-    else if (/^(terrain|underside|islet)/i.test(o.name)) { o.material = ground; /* Synty props carry vertex colours too, so match by name */ o.castShadow = !/terrain/i.test(o.name); o.receiveShadow = true; }
+    if (/^falls/i.test(o.name)) { o.material = falls; home.falls = falls; o.castShadow = false; }
+    else if (/^water/i.test(o.name)) { o.material = water; o.receiveShadow = true; o.castShadow = false; }
+    else if (/^terrain/i.test(o.name)) { o.material = ground; o.receiveShadow = true; }
+    else if (/^(cliff|islet)/i.test(o.name)) { o.material = rock; o.receiveShadow = true; o.castShadow = true; } // Synty props carry vertex colours too, so match by name
   });
-  // FBX units and axes: scale to the authored 68 m terrain width and stand it on the plot
   isl.updateMatrixWorld(true);
-  let ter = null; isl.traverse((o) => { if (o.isMesh && /terrain/i.test(o.name)) ter = o; });
-  const tb = new THREE.Box3().setFromObject(ter || isl), w = tb.max.x - tb.min.x;
-  isl.scale.multiplyScalar(68.9 / Math.max(1e-3, w)); isl.updateMatrixWorld(true);
+  const w = new THREE.Box3().setFromObject(isl).getSize(new THREE.Vector3()).x;
+  isl.scale.multiplyScalar(w > 1000 ? 0.01 : 1); isl.updateMatrixWorld(true); // FBX from Blender arrives in centimetres
   home.scenery.add(isl); home.island = isl;
 }
 export const tileCenter = (cfg, x, z) => { const S = cfg.sanctuary, o = -S.grid * S.tile / 2 + S.tile / 2; return new THREE.Vector3(o + x * S.tile, 0, o + z * S.tile); };
@@ -248,6 +277,7 @@ export function pickHome(cfg, sx, sy) {
   return { facility: hit?.object.userData.facility || null, decor: hit && hit.object.userData.decor !== undefined ? hit.object.userData.decor : null, tile };
 }
 export function renderHome(renderer, dt, layout) {
+  if (home.falls) home.falls.uniforms.t.value += dt;
   const w = innerWidth, h = innerHeight, c = home.cam;
   c.aspect = w / h;
   const portrait = w < h, free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
