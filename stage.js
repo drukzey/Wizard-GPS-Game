@@ -51,6 +51,7 @@ export function buildHub() {
 }
 const findBone = (root, re) => { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; };
 
+export const STAFF_LEN = 1.7, STAFF_ROT = new THREE.Euler(0, 0, Math.PI / 2), STAFF_POS = new THREE.Vector3(0, 0, 0);
 /** Put a weapon model in the wizard's right hand (shared with the battle visual). */
 export async function attachStaff(wizard, modelName) {
   const hand = findBone(wizard, /hand_r$/i); if (!hand) return null;
@@ -60,8 +61,10 @@ export async function attachStaff(wizard, modelName) {
   obj.userData.isStaff = true;
   wizard.updateMatrixWorld(true);
   const ws = new THREE.Vector3(); hand.getWorldScale(ws);
-  obj.scale.setScalar(1 / ws.x);
-  obj.rotation.set(0, 0, Math.PI / 2); obj.position.set(0, 0, 0);
+  const box = new THREE.Box3().setFromObject(obj), len = Math.max(1e-3, box.max.y - box.min.y);
+  const k = STAFF_LEN / len / ws.x; obj.scale.setScalar(k);
+  obj.rotation.set(STAFF_ROT.x, STAFF_ROT.y, STAFF_ROT.z);
+  obj.position.copy(STAFF_POS).multiplyScalar(1 / ws.x); // grip a third of the way up
   hand.add(obj); return obj;
 }
 

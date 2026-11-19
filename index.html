@@ -80,6 +80,20 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
 .toast[hidden]{display:block;opacity:0;pointer-events:none}
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;z-index:9}
 #loading .lb{overflow:hidden}#loading .lb i{display:block;height:100%;width:0;transition:width .2s}
+#world{position:fixed;inset:0;z-index:6;background:#18201d}
+#world[hidden]{display:none}
+#worldMap{position:absolute;inset:0}
+.lochelp{position:absolute;left:50%;top:70px;transform:translateX(-50%);width:min(460px,92vw);background:#0b0f10f2;border:1px solid #d9b46a;border-radius:6px;padding:14px 16px;z-index:2}
+.lochelp>b{font:800 16px Grenze,serif;color:var(--gold)}.lochelp p{color:var(--text);font-size:14px}
+.lochelp[hidden],.locgps[hidden]{display:none}
+.locgps{position:absolute;right:10px;bottom:70px}
+.wbar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;justify-content:space-between;font:700 13px 'Alegreya Sans',sans-serif;pointer-events:none}
+.wbar>*{pointer-events:auto}
+#worldStatus{background:#000c;border:1px solid #d9b46a66;padding:7px 12px;border-radius:4px}
+.wbtn{font:800 14px 'Alegreya Sans',sans-serif;color:var(--text);background:#000c;border:1px solid #d9b46a88;border-radius:4px;padding:9px 14px;cursor:pointer}
+.wmsg{position:absolute;bottom:18px;left:50%;transform:translateX(-50%);max-width:92vw;background:#000c;border:1px solid #d9b46a55;padding:9px 14px;border-radius:4px;font:600 13px 'Alegreya Sans',sans-serif;text-align:center}
+.wwarn{position:absolute;top:60px;left:50%;transform:translateX(-50%);max-width:92vw;background:#5a1414ee;border:1px solid #ff6a6a;padding:10px 14px;border-radius:4px;font:700 13px 'Alegreya Sans',sans-serif;text-align:center}
+.me{width:46px;height:46px;position:relative}
 .me .ico{position:absolute;inset:0;width:46px;height:46px;animation:spin 6s linear infinite}
 .me span{position:absolute;left:50%;top:50%;width:16px;height:16px;margin:-8px;border-radius:50%;background:#e9ddff;box-shadow:0 0 12px #b08bff,0 0 0 3px #2a1d55}
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -93,21 +107,6 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
 @media (prefers-reduced-motion:reduce){.me .ico,.spawn.glow .orbit{animation:none}}
 @media (max-height:520px){.orb{width:72px;height:72px}.stam{top:80px}.ab{width:74px;height:74px}.dodgeBtn{bottom:96px}}
 @media (prefers-reduced-motion:reduce){.ab.shake{animation:none}}
-</style>
-</head>
-<body>
-<canvas id="c"></canvas>
-<div class="hud" id="hud">
-  <div id="vig"></div>
-  <div class="orbs">
-    <div class="orb hp" id="hpOrb" aria-label="Health"><div class="well"><div class="fill" id="hpFill"></div></div><div class="glass"></div><div class="sheen"></div><div class="frame"></div><span class="sh" id="shT"></span><b id="hpT"></b><small>HEALTH</small></div>
-    <div class="orb mp" aria-label="Mana"><div class="well"><div class="fill" id="mpFill"></div></div><div class="glass"></div><div class="sheen"></div><div class="frame"></div><b id="mpT"></b><small>MANA</small></div>
-  </div>
-  <div class="stam" id="stBar" aria-label="Stamina"><div class="bg"></div><div class="f" id="stFill"></div><div class="fr"></div><small>STAMINA</small></div>
-  <div class="top" id="topT">Wave 1 · 0 defeated</div>
-  <button class="menuBtn" id="menuBtn" aria-label="Open menu">☰</button>
-  <div class="banner" id="banner"></div>
-  <div class="stick" id="stickL"><i></i></div>
 /* ===== Tomecraft camp interface (M5) =====
    Palette: night slate, iron, bone text, ash for secondary text, ember for actions and alerts, brass for wealth and progress.
    Type: Grenze for names and headings (a hand-cut gothic serif), Alegreya Sans for everything you read. */
