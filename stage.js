@@ -31,7 +31,7 @@ export const hub = { scene: null, cam: null, wizard: null, staff: null, team: []
 
 export function buildHub() {
   const s = hub.scene = new THREE.Scene();
-  s.background = new THREE.Color(0x121618); s.fog = new THREE.Fog(0x121618, 9, 22);
+  s.background = new THREE.Color(0x121618); s.fog = new THREE.Fog(0x121618, 14, 60);
   makeLights(s);
   hub.cam = new THREE.PerspectiveCamera(32, 1, 0.1, 60);
   const plat = hub.platform = new THREE.Group(); s.add(plat);
@@ -87,6 +87,7 @@ export function renderHub(renderer, dt, t, layout) {
   const w = innerWidth, h = innerHeight, c = hub.cam;
   c.aspect = w / h;
   const portrait = w < h;
+  c.fov = portrait ? 50 : 32;
   // pull back so the whole platform fits in the part of the screen the sheet leaves free
   const free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
   const k = Math.min(2.4, 1 / Math.max(0.35, free));
@@ -112,7 +113,7 @@ export const home = { scene: null, cam: null, root: null, facilities: {}, decor:
 
 export function buildHome(cfg) {
   const s = home.scene = new THREE.Scene();
-  s.background = new THREE.Color(0x1a2124); s.fog = new THREE.Fog(0x1a2124, 40, 90);
+  s.background = new THREE.Color(0x1a2124); s.fog = new THREE.Fog(0x1a2124, 60, 160);
   const key = makeLights(s, 0xffe2b8, 0x9fd4ff);
   Object.assign(key.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, far: 80 }); key.position.set(12, 24, 10);
   home.cam = new THREE.PerspectiveCamera(36, 1, 0.5, 200);
@@ -200,7 +201,8 @@ export function renderHome(renderer, dt, layout) {
   const w = innerWidth, h = innerHeight, c = home.cam;
   c.aspect = w / h;
   const portrait = w < h, free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
-  const dist = home.dist * Math.min(2, 1 / Math.max(0.4, free)) * (portrait ? 1.25 : 1), cp = Math.cos(home.pitch);
+  c.fov = portrait ? 50 : 36;
+  const dist = home.dist * Math.min(2, 1 / Math.max(0.4, free)) * (portrait ? 0.9 : 1), cp = Math.cos(home.pitch);
   c.position.set(home.target.x + Math.sin(home.yaw) * cp * dist, Math.sin(home.pitch) * dist, home.target.z + Math.cos(home.yaw) * cp * dist);
   c.lookAt(home.target);
   c.clearViewOffset();
