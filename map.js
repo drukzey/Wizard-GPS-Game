@@ -1,7 +1,7 @@
 // Tomecraft world map (M6 alpha): MapLibre + OpenFreeMap vector tiles, phone GPS, familiar markers.
 // Location never leaves the device. Needs the hosted site: Claude artifact pages block location and map tiles.
-import * as World from './world.js?v=5';
-import * as Col from './collection.js?v=5';
+import * as World from './world.js?v=6';
+import * as Col from './collection.js?v=6';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -108,6 +108,7 @@ function showLocHelp(kind) {
     none: 'This browser has no location support. Open the game in Safari or Chrome on your phone.',
   }[kind];
   $('locText').innerHTML = text;
+  if (kind !== 'slow') $('worldStatus').textContent = 'Location unavailable';
   $('locHelp').hidden = false;
   $('locRetry').hidden = kind === 'none' || kind === 'inapp';
 }
