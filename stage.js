@@ -52,7 +52,7 @@ export function buildHub() {
 const findBone = (root, re) => { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; };
 
 // How a staff sits in the old Synty rig's right hand (tuned by eye; the hand's local X runs along the fingers).
-export const staffTune = { len: 1.75, rx: 0, ry: 0, rz: -Math.PI / 2, grip: 0.42, ox: 0, oy: 0, oz: 0, curl: 1.1 };
+export const staffTune = { len: 1.75, rx: -1, ry: 0.5, rz: -Math.PI / 2, grip: 0.47, ox: 0, oy: 0, oz: 0, curl: 1.1 };
 /** Close the hand around the shaft: the animations don't drive finger bones, so they keep this pose. */
 function curlFingers(hand, amount) {
   hand.traverse((b) => { if (!b.isBone || b === hand) return;
@@ -69,7 +69,7 @@ export async function attachStaff(wizard, modelName) {
   // Synty staffs are modelled upright with the grip at the origin; the old rig's hand points down its local X.
   obj.userData.isStaff = true;
   wizard.updateMatrixWorld(true);
-  const ws = new THREE.Vector3(); hand.getWorldScale(ws);
+  const ws = new THREE.Vector3(), rs = new THREE.Vector3(); hand.getWorldScale(ws); wizard.getWorldScale(rs); ws.divide(rs); // hand scale relative to the character, so the staff matches however big the character is drawn
   const T = staffTune, box = new THREE.Box3().setFromObject(obj), len = Math.max(1e-3, box.max.y - box.min.y);
   const k = T.len / len / ws.x; obj.scale.setScalar(k);
   obj.rotation.set(T.rx, T.ry, T.rz);
@@ -212,7 +212,7 @@ export async function syncHome(cfg, h) {
     const obj = await D.loadModel(model, true); if (!obj) continue;
     const glass = await D.loadModel(`${model}_glass`, true);
     if (glass) { glass.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshLambertMaterial({ color: 0xffcf7a, emissive: 0x6a4410, transparent: true, opacity: 0.85 }); }); obj.add(glass); }
-    const g = fit(obj, (f.size[0] - 0.4) * S.tile * (h.facilities[id] === 1 ? 0.85 : 1));
+    const g = fit(obj, (f.size[0] - 0.4) * S.tile * (h.facilities[id] === 1 ? 0.85 : 1), (S.sink || {})[model] || 0); // sink stilted or plinthed models into the grass
     const c = tileCenter(cfg, f.at[0] + (f.size[0] - 1) / 2, f.at[1] + (f.size[1] - 1) / 2);
     g.position.copy(c); g.rotation.y = Math.atan2(-c.x, -c.z); // doors face the middle of the plot
     g.userData = { model, facility: id }; g.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.userData.facility = id; } });

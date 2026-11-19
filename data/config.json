@@ -1368,6 +1368,11 @@
           "arcaneStone": 8
         }
       }
+    },
+    "sink": {
+      "hut": 0.3,
+      "house_08": 0.04,
+      "house_03": 0.04
     }
   },
   "research": {
