@@ -173,7 +173,7 @@ export async function dressIsland() {
   isl.traverse((o) => {
     if (!o.isMesh) return;
     if (/water/i.test(o.name)) { o.material = water; o.receiveShadow = true; o.castShadow = false; home.water = o; }
-    else if (o.geometry.attributes.color) { o.material = ground; o.castShadow = !/terrain/i.test(o.name); o.receiveShadow = true; }
+    else if (/^(terrain|underside|islet)/i.test(o.name)) { o.material = ground; // Synty props carry their own vertex colours too, so match by name o.castShadow = !/terrain/i.test(o.name); o.receiveShadow = true; }
   });
   // FBX units and axes: scale to the authored 68 m terrain width and stand it on the plot
   isl.updateMatrixWorld(true);
