@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=17';
-import * as Col from './collection.js?v=17';
+import * as World from './world.js?v=18';
+import * as Col from './collection.js?v=18';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -56,7 +56,8 @@ export function returnToWorld() { $('world').hidden = false; st.open = true; sca
 function createMap() {
   const start = H.cfg.world.demoStart;
   st.map = new maplibregl.Map({ container: 'worldMap', style: STYLE, center: [start.lon, start.lat], zoom: ZOOM, pitch: PITCH, bearing: -20,
-    attributionControl: { compact: true }, maxPitch: 70, minZoom: 16, dragRotate: true, touchPitch: true });
+    attributionControl: false, maxPitch: 70, minZoom: 16, dragRotate: true, touchPitch: true });
+  st.map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left'); // map data credit stays visible, clear of the game buttons
   st.map.on('load', () => { fantasyStyle(st.map); addOverlays(); st.map.addLayer(layer3d); st.ready = true; scan(true); });
   st.map.on('click', (e) => { if (st.demo) st.demoTarget = { lat: e.lngLat.lat, lon: e.lngLat.lng }; });
   st.map.on('dragstart', () => { st.follow = false; });
@@ -143,7 +144,7 @@ const layer3d = {
 };
 function setOrigin(pos) {
   g3.origin = { ...pos }; g3.merc = maplibregl.MercatorCoordinate.fromLngLat([pos.lon, pos.lat], 0);
-  for (const th of g3.things.values()) { const p = local(th.userData.at); th.position.set(p.x, 0, p.z); }
+  for (const th of [...g3.things.values(), ...(trees.group?.children || [])]) { const p = local(th.userData.at); th.position.set(p.x, 0, p.z); }
 }
 /** Metres east (x) and south (z) of the layer origin. */
 function local(p) {
@@ -182,6 +183,32 @@ function addPortal3d(site) {
   for (let i = 0; i < 6; i++) { const shard = new THREE.Mesh(new THREE.OctahedronGeometry(0.9), glow); const a = (i / 6) * Math.PI * 2; shard.position.set(Math.cos(a) * 9, 8.5 + Math.sin(a) * 9, 0); spin.add(shard); }
   const ring = groundRing(col, 7, 9); g.add(ring); g.userData.ring = ring;
   const p = local(site); g.position.set(p.x, 0, p.z); g3.scene.add(g); g3.things.set(site.id, g);
+}
+// Scenery: trees on the map's parks and grass, at fixed spots per cell so they never shuffle. Cheap Kingdom tree model.
+const trees = { cells: new Set(), group: null };
+async function plantTrees() {
+  if (!g3.scene || !g3.origin) return;
+  if (!trees.group) {
+    trees.group = new THREE.Group(); g3.scene.add(trees.group); trees.src = await H.loadModel('tree', true);
+    if (trees.src) { const b = new THREE.Box3().setFromObject(trees.src); trees.k = 9 / Math.max(1e-3, b.max.y - b.min.y); } // ~9 m tall, a touch larger than life like the figures
+  }
+  if (!trees.src) return;
+  const W = { ...H.cfg.world, cellM: 60 }, c = World.cellOf(W, st.pos.lat, st.pos.lon);
+  for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
+    const key = `${c.cx + dx}:${c.cy + dy}`; if (trees.cells.has(key)) continue;
+    const lat0 = (c.cy + dy) * c.latStep, lon0 = (c.cx + dx) * c.lonStep, pt = st.map.project([lon0 + c.lonStep / 2, lat0 + c.latStep / 2]);
+    const cv = st.map.getCanvas(); if (pt.x < 0 || pt.y < 0 || pt.x > cv.clientWidth || pt.y > cv.clientHeight) continue; // only judge ground the map has drawn
+    trees.cells.add(key);
+    let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+    for (let i = 0; i < 3; i++) {
+      h = (h * 1664525 + 1013904223) >>> 0; const u = h / 4294967296; h = (h * 1664525 + 1013904223) >>> 0; const v = h / 4294967296;
+      const p = { lat: lat0 + v * c.latStep, lon: lon0 + u * c.lonStep }, q = st.map.project([p.lon, p.lat]);
+      const f = st.map.queryRenderedFeatures([q.x, q.y]);
+      if (!f.some((x) => x.layer.type === 'fill' && /park|wood|forest|grass|scrub|cemetery/.test(x.layer.id)) || f.some((x) => /water|building/.test(x.layer.id))) continue;
+      const t = trees.src.clone(); t.scale.setScalar(trees.k * (0.75 + u * 0.5)); t.rotation.y = v * 6.28;
+      const l = local(p); t.position.set(l.x, 0, l.z); t.userData.at = p; trees.group.add(t);
+    }
+  }
 }
 function removeThing(id) { const g = g3.things.get(id); if (g) { g3.scene.remove(g); g3.things.delete(id); } }
 
@@ -267,6 +294,7 @@ function scan(force) {
   for (const s of spawns) if (!st.markers.has(s.id)) { st.markers.set(s.id, hitMarker(s, () => tapSpawn(s), spawnLabel(s))); addFamiliar3d(s); }
   for (const s of sites) if (!st.rifts.has(s.id)) { st.rifts.set(s.id, hitMarker(s, () => tapRift(s), H.cfg.rifts.find((r) => r.id === s.riftId).name, 'rift')); addPortal3d(s); }
   st.spawns = spawns; st.sites = sites;
+  plantTrees();
   refreshRanges(); H.onNearby();
 }
 // Don't place familiars on water or roads (GDD §11). Only checkable for points the map has drawn.
