@@ -160,3 +160,21 @@ test('config references are valid', () => {
   }
   for (const w of cfg.waves) for (const e of w) assert.ok(cfg.enemies[e], e);
 });
+
+test('mastery contribution is credited to the slot that did the work, and only real work counts', () => {
+  const s = fresh(); const p = s.state.player;
+  const e = s.debugSpawn('enm_troll', 0, -6);
+  s.step({ aim: { x: 0, z: -1 }, abilities: [true, false, false] }); run(s, {}, 1); // bolt from slot 0
+  s.step({ abilities: [false, true, false] }); s.applyDamage(p, 120, 'test');      // shield from slot 1
+  const [a, b, c] = s.state.slots.map((x) => x.contrib);
+  assert.ok(a.damage > 0 && a.hits === 1 && a.damage <= e.maxHp);
+  assert.equal(b.absorbed, 120); assert.equal(b.damage, 0);
+  assert.deepEqual(c, { damage: 0, absorbed: 0, hits: 0 });
+});
+
+test('a per-slot ability override replaces the base ability', () => {
+  const ab = { ...cfg.abilities.abl_arcane_bolt, damage: 1 };
+  const s = createSim(cfg, { ...cfg.defaultLoadout, abilities: [ab] }, 1, { waves: false });
+  assert.equal(s.state.slots[0].ab.damage, 1);
+  assert.equal(s.state.slots[1].ab, cfg.abilities[cfg.familiars[cfg.defaultLoadout.familiarIds[1]].abilityId]);
+});

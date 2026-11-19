@@ -18,7 +18,7 @@ export function newCollection() {
 export function loadCollection(cfg, raw) {
   const c = newCollection();
   if (!raw || raw.version !== SAVE_VERSION) return c;
-  for (const [fid, o] of Object.entries(raw.owned || {})) if (cfg.familiars[fid]) c.owned[fid] = { firstAt: o.firstAt, credits: Math.max(0, o.credits | 0), captures: Math.max(1, o.captures | 0), locked: !!o.locked };
+  for (const [fid, o] of Object.entries(raw.owned || {})) if (cfg.familiars[fid]) c.owned[fid] = { firstAt: o.firstAt, credits: Math.max(0, o.credits | 0), captures: Math.max(1, o.captures | 0), locked: !!o.locked, ascension: Math.max(0, Math.min(cfg.ascension.incrementalCredits.length - 1, o.ascension | 0)) };
   for (const fid of Object.keys(raw.seen || {})) if (cfg.familiars[fid]) c.seen[fid] = true;
   c.encounters = (raw.encounters || []).filter((e) => cfg.familiars[e.familiarId]);
   c.processed = (raw.processed || []).slice(-300);

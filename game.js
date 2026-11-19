@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=6';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=6';
-import * as Col from './collection.js?v=6';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=6';
+import { createSim } from './sim.js?v=7';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=7';
+import * as Col from './collection.js?v=7';
+import * as P from './progression.js?v=7';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=7';
 
 const $ = (id) => document.getElementById(id);
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -110,7 +111,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=6`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=7`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`);
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -119,7 +120,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = (await import('./pub/anims.js?v=6')).default;
+    const packed = (await import('./pub/anims.js?v=7')).default;
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -128,7 +129,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = (await import('./pub/models.js?v=6')).default;
+  const models = (await import('./pub/models.js?v=7')).default;
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -197,7 +198,7 @@ function buildArena(cfg) {
 }
 
 // ---------- game state ----------
-let cfg, sim = null, running = false, paused = true, col = null;
+let cfg, sim = null, running = false, paused = true, col = null, prof = null, runTx = null;
 let loadout = store.get('ww.loadout', null);
 const vis = { player: null, enemies: new Map(), projectiles: new Map(), zones: new Map(), fx: [] };
 const tmpV = new THREE.Vector3();
@@ -553,7 +554,7 @@ function handleEvents(events) {
       case 'wave': banner(`Wave ${ev.wave}`); if (ev.wave > 1) waveDiscovery(); break;
       case 'defeat':
         running = false; if (pa) pa.playOnce('death', 1.2);
-        setTimeout(() => { $('defeatT').textContent = `You reached wave ${sim.state.wave + 1} and defeated ${sim.state.player.kills} ${sim.state.player.kills === 1 ? 'enemy' : 'enemies'}.`; $('defeat').hidden = false; }, 1400);
+        { const r = settleRun(); setTimeout(() => showResults(r, true), 1400); }
         break;
     }
   }
@@ -585,10 +586,98 @@ function refreshMenu() {
   $('pickT').textContent = loadout.length === 3 ? (sim && running && !sameLoadout() ? 'Changing familiars restarts the battle.' : '') : `Pick ${3 - loadout.length} more`;
   $('startBtn').disabled = loadout.length !== 3;
   $('startBtn').textContent = sim && running && sameLoadout() ? 'Resume' : 'Start battle';
+  $('endBtn').hidden = !(sim && running);
+  renderPresets();
 }
+const mkBtn = (text, fn, cls = 'btn alt sm') => { const b = document.createElement('button'); b.className = cls; b.textContent = text; b.onclick = fn; return b; };
+function renderPresets() {
+  const box = $('presets'); box.innerHTML = '';
+  prof.presets.forEach((ps, i) => {
+    const d = document.createElement('div'); d.className = 'preset';
+    d.innerHTML = `<div class="grow"><b>Loadout ${i + 1}</b><div class="s">${ps ? ps.map((f) => cfg.familiars[f].name).join(' · ') : 'Empty'}</div></div>`;
+    const use = mkBtn('Use', () => { loadout = [...ps]; refreshMenu(); }); use.disabled = !ps;
+    const save = mkBtn(ps ? 'Replace' : 'Save current', () => { P.savePreset(cfg, prof, i, loadout); saveProf(); renderPresets(); }); save.disabled = loadout.length !== 3;
+    d.append(use, save); box.appendChild(d);
+  });
+}
+function saveProf() { store.set('tc.profile', prof); renderWallet(); }
+function renderWallet() {
+  const L = P.levelInfo(cfg, prof.xp);
+  $('wallet').innerHTML = `<span><b>Wizard level ${L.level}</b></span><span class="bar sm"><i style="width:${L.need ? Math.round((100 * L.into) / L.need) : 100}%"></i></span>
+    <span>${L.need ? `${L.into}/${L.need} XP` : 'max level'}</span><span><b>${prof.gold}</b> Gold</span><span><b>${prof.essence}</b> Arcane Essence</span>`;
+}
+function masteryBar(fid) {
+  const mi = P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0);
+  const pct = mi.nextAt === null ? 100 : Math.round((100 * (mi.xp - mi.prevAt)) / (mi.nextAt - mi.prevAt));
+  return `<span class="bar"><i style="width:${pct}%"></i></span><div class="s">Mastery ${mi.level}${mi.nextAt === null ? ' (max)' : ` · ${Math.floor(mi.xp)}/${mi.nextAt} XP`}</div>`;
+}
+
+// ---------- runs and results (M3) ----------
+/** Grant this run's rewards once. Safe to call twice: the transaction id is spent on the first call. */
+function settleRun() {
+  if (!sim || !runTx) return null;
+  const st = sim.state, tx = runTx; runTx = null;
+  const cleared = Math.max(0, st.wave + (st.enemies.some((e) => e.hp > 0) ? 0 : 1));
+  const rw = P.battleRewards(cfg, { kills: st.player.kills, wavesCleared: cleared, slots: st.slots.map((s) => ({ familiarId: s.familiarId, ...s.contrib })) });
+  const g = P.grant(cfg, prof, tx, rw);
+  if (g.applied) Object.assign(prof.stats, { battles: prof.stats.battles + 1, bestWave: Math.max(prof.stats.bestWave, cleared), kills: prof.stats.kills + st.player.kills });
+  saveProf();
+  return { cleared, kills: st.player.kills, rw, g, fids: st.slots.map((s) => s.familiarId) };
+}
+function showResults(r, defeated) {
+  $('resH').textContent = defeated ? 'Defeated' : 'Run complete';
+  $('defeatT').textContent = `Waves cleared: ${r.cleared} · Enemies defeated: ${r.kills}`;
+  const M = cfg.progression.mastery;
+  let h = r.rw.xp ? `<p><b>+${r.rw.xp} XP · +${r.rw.gold} Gold${r.rw.essence ? ` · +${r.rw.essence} Arcane Essence` : ''}</b></p>` : '<p>No rewards this time. Defeat at least one enemy to earn rewards.</p>';
+  if (r.g.applied && r.g.wizard.to > r.g.wizard.from) h += `<p class="lvl">Wizard level ${r.g.wizard.to}!</p>`;
+  for (const fid of r.fids) {
+    const m = r.g.mastery?.[fid], f = cfg.familiars[fid];
+    const note = m ? `+${m.gained} Mastery${m.to > m.from ? ` · <span class="lvl">Mastery ${m.to}!${m.from < M.branchAt && m.to >= M.branchAt ? ' Modifiers unlocked.' : ''}</span>` : ''}`
+      : r.rw.xp ? 'No Mastery: it didn\'t hit or block anything this run.' : '';
+    h += `<div class="res"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow"><b>${f.name}</b><div class="s">${note}</div>${masteryBar(fid)}</div></div>`;
+  }
+  h += `<p class="s"><b>Next goal:</b> ${nextGoal(r.fids)}</p>`;
+  $('resBody').innerHTML = h; $('defeat').hidden = false; paused = true;
+}
+function nextGoal(fids) {
+  const ranks = cfg.ascension.ranks;
+  for (const fid of Object.keys(col.owned)) { const c = P.ascensionCost(cfg, col, fid); if (c && !c.maxed && !c.short) return `${cfg.familiars[fid].name} can Ascend to ${ranks[c.next]}. Open it in the Journal.`; }
+  const best = fids.map((fid) => ({ fid, mi: P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0) })).filter((x) => x.mi.nextAt !== null).sort((a, b) => (a.mi.nextAt - a.mi.xp) - (b.mi.nextAt - b.mi.xp))[0];
+  return best ? `${Math.ceil(best.mi.nextAt - best.mi.xp)} more Mastery for ${cfg.familiars[best.fid].name} to reach Mastery ${best.mi.level + 1}.` : 'Bind more familiars in Explore.';
+}
+
+// ---------- familiar detail: Mastery, Ascension, modifier (M3) ----------
+let detFid = null;
+function openDetail(fid) { detFid = fid; $('menu').hidden = true; $('famDet').hidden = false; renderDetail(); }
+function renderDetail() {
+  const fid = detFid, f = cfg.familiars[fid], ab = P.effectiveAbility(cfg, col, prof, fid), ranks = cfg.ascension.ranks;
+  const mi = P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0), c = P.ascensionCost(cfg, col, fid), M = cfg.progression.mastery;
+  const cur = prof.familiars[fid]?.modifierId || null, locked = mi.level < M.branchAt;
+  const asc = c.maxed ? 'Fully ascended.' : `Next rank, <b>${ranks[c.next]}</b>, needs ${c.need} duplicate ${c.need === 1 ? 'credit' : 'credits'}. You have ${c.have}.${c.short ? ` You can cover the missing ${c.short} with ${c.essenceForShort} Arcane Essence (you have ${prof.essence}).` : ''}`;
+  $('detBody').innerHTML = `<h1>${f.name}</h1><div class="s">${f.type.toUpperCase()} · ${f.rarity} · <b>${ab.name}</b>${ab.modifierName ? ` with ${ab.modifierName}` : ''}. Changes apply from your next battle.</div>
+    <h2>Mastery</h2>${masteryBar(fid)}<p class="s">Earned when this familiar's ability damages enemies or blocks damage in battle.</p>
+    <h2>Ascension · ${ranks[c.rank]} (${c.rank} of ${ranks.length - 1})</h2><p class="s">Each rank adds ${Math.round(cfg.progression.ascension.potencyPerRank * 1000) / 10}% to ${ab.name}'s power. ${asc}</p><div class="actions" id="ascAct"></div>
+    <h2>Modifier <span class="comp">${locked ? `unlocks at Mastery ${M.branchAt}` : 'free to change'}</span></h2><div class="mods" id="mods"></div>`;
+  if (!c.maxed) {
+    const b = mkBtn(c.short ? `Ascend (${c.need - c.short} credits + ${c.essenceForShort} Essence)` : `Ascend (${c.need} ${c.need === 1 ? 'credit' : 'credits'})`, () => {
+      const r = P.ascend(cfg, col, prof, fid, c.short > 0);
+      if (r.ok) { saveCol(); saveProf(); toast(`${f.name} reached ${ranks[r.rank]}.`, '#d9b46a'); }
+      renderDetail();
+    }, 'btn');
+    b.disabled = c.short > 0 && prof.essence < c.essenceForShort;
+    $('ascAct').appendChild(b);
+  }
+  for (const m of [{ id: null, name: 'No modifier', desc: 'The standard ability' }, ...P.modifiersFor(cfg, fid)]) {
+    const b = mkBtn('', () => { if (P.setModifier(cfg, prof, fid, m.id).ok) { saveProf(); renderDetail(); } }, cur === m.id ? 'on' : '');
+    b.innerHTML = `${m.name}<div class="s">${m.desc}</div>`; b.disabled = locked && m.id !== null; b.setAttribute('aria-pressed', cur === m.id);
+    $('mods').appendChild(b);
+  }
+}
+$('detClose').onclick = () => { $('famDet').hidden = true; toggleMenu(true, 'journal'); };
+$('endBtn').onclick = () => { const r = settleRun(); running = false; $('menu').hidden = true; if (r) showResults(r, false); };
 let activeLoadout = null;
 const sameLoadout = () => activeLoadout && activeLoadout.join() === loadout.join();
-function toggleMenu(open, tab) { $('menu').hidden = !open; paused = open; if (open) { if (tab) showTab(tab); refreshMenu(); renderExplore(); renderJournal(); } }
+function toggleMenu(open, tab) { $('menu').hidden = !open; paused = open; if (open) { if (tab) showTab(tab); refreshMenu(); renderExplore(); renderJournal(); renderWallet(); } }
 function showTab(tab) {
   for (const b of document.querySelectorAll('.tab')) b.classList.toggle('on', b.dataset.tab === tab);
   for (const p of document.querySelectorAll('.pane')) p.hidden = p.id !== `pane-${tab}`;
@@ -610,9 +699,13 @@ function clearVisuals() {
 }
 function startBattle() {
   store.set('ww.loadout', loadout);
+  const prev = settleRun(); // switching loadouts mid-run still pays out the run so far
+  if (prev && prev.rw.xp) toast(`Previous run: +${prev.rw.xp} XP, +${prev.rw.gold} Gold`);
   activeLoadout = [...loadout];
   clearVisuals();
-  sim = createSim(cfg, { weaponId: cfg.defaultLoadout.weaponId, familiarIds: activeLoadout }, (Math.random() * 1e9) | 0);
+  const seed = (Math.random() * 1e9) | 0;
+  sim = createSim(cfg, { weaponId: cfg.defaultLoadout.weaponId, familiarIds: activeLoadout, abilities: activeLoadout.map((fid) => P.effectiveAbility(cfg, col, prof, fid)) }, seed);
+  runTx = `battle:${Date.now().toString(36)}:${seed}`;
   if (vis.player) scene.remove(vis.player, vis.player.userData.aimPivot);
   vis.player = playerVisual();
   buildAbilityButtons(); running = true;
@@ -680,14 +773,15 @@ function renderJournal() {
   if (!col) return;
   const ids = Object.keys(cfg.familiars), owned = ids.filter((f) => col.owned[f]);
   $('colT').textContent = `· ${owned.length} of ${ids.length} bound`;
+  $('journal').onclick = (ev) => { const b = ev.target.closest('[data-det]'); if (b) openDetail(b.dataset.det); };
   $('journal').innerHTML = ids.map((fid) => {
     const f = cfg.familiars[fid], o = col.owned[fid], seen = col.seen[fid], r = rarityCfg(f.rarity), ab = cfg.abilities[f.abilityId];
     if (!o && !seen) return `<div class="jc unknown"><div class="famIco" style="--c:#555">${icon('i_arcane', '#555')}</div><div><div class="t">Undiscovered</div><div class="s">Keep exploring.</div></div></div>`;
-    const asc = o && Col.ascensionInfo(cfg, o.credits);
+    const c = o && P.ascensionCost(cfg, col, fid);
     return `<div class="jc"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div>
       <div class="t">${f.name}</div>
       <div class="row" style="display:flex;gap:5px;flex-wrap:wrap;margin:4px 0"><span class="badge" style="--c:${css(f.type)}">${icon(`i_${f.type}`, css(f.type))}${f.type.toUpperCase()}</span><span class="badge" style="--c:${r.color}">${'◆'.repeat(r.pips)} ${r.label.toUpperCase()}</span></div>
-      <div class="s">${o ? `Ability: <b>${ab.name}</b><br>Bound ${o.captures}× · ${o.credits} duplicate ${o.credits === 1 ? 'credit' : 'credits'}<br>Ascension: ${asc.nextAt === null ? 'enough credits for Mastered' : `${asc.nextAt - o.credits} more ${asc.nextAt - o.credits === 1 ? 'credit' : 'credits'} for the next rank`} (spending comes in M3)` : 'Seen in the wilds. Not bound yet.'}</div></div></div>`;
+      <div class="s">${o ? `Ability: <b>${ab.name}</b><br>Bound ${o.captures}× · ${o.credits} duplicate ${o.credits === 1 ? 'credit' : 'credits'}<br>Ascension: <b>${cfg.ascension.ranks[c.rank]}</b>${c.maxed ? '' : c.short ? ` · ${c.short} more for the next rank` : ' · <span class="lvl">ready to Ascend</span>'}</div>${masteryBar(fid)}<button class="btn alt sm" data-det="${fid}" style="margin-top:8px">Manage</button>` : 'Seen in the wilds. Not bound yet.</div>'}</div></div>`;
   }).join('');
 }
 
@@ -785,7 +879,10 @@ function finishBinding() {
   saveCol();
   bind.quality = []; bind.misses = 0;
   const pct = Math.round((res.chance || 0) * 100);
-  if (res.outcome === 'bound') { $('bind').hidden = true; showReveal(res); }
+  if (res.outcome === 'bound') {
+    const rw = P.bindingRewards(cfg, res), g = P.grant(cfg, prof, `bind:${bind.enc.id}`, rw); saveProf();
+    $('bind').hidden = true; showReveal(res, g.applied ? rw : null);
+  }
   else if (res.outcome === 'resisted') {
     $('bindMsg').textContent = `It resisted (your chance was ${pct}%). ${res.attemptsLeft} ${res.attemptsLeft === 1 ? 'try' : 'tries'} left.`;
     $('bindGo').hidden = false; $('bindGo').textContent = 'Try again';
@@ -834,17 +931,18 @@ $('bindGo').onclick = () => startStage(1);
 $('bindLeave').onclick = () => { bind.active = false; $('bind').hidden = true; if (bindFrom === 'map') returnToWorld(); else toggleMenu(true, 'explore'); };
 addEventListener('keydown', (e) => { if (!$('bind').hidden && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); bindTap(); } });
 
-function showReveal(res) {
+function showReveal(res, rw) {
   const f = cfg.familiars[res.familiarId], r = rarityCfg(res.rarity), tier = cfg.rarities.indexOf(r), ab = cfg.abilities[f.abilityId];
   const card = $('revealCard'); card.style.setProperty('--rc', r.color);
   card.classList.toggle('big', tier >= 4 && !settings.reducedMotion);
   $('revBadge').textContent = `${'◆'.repeat(r.pips)} ${r.label.toUpperCase()}`;
   $('revName').textContent = res.first ? `${f.name} bound!` : `${f.name} bound again`;
   $('revType').innerHTML = `${icon(`i_${f.type}`, css(f.type))} ${f.type.toUpperCase()}`;
-  const asc = Col.ascensionInfo(cfg, col.owned[res.familiarId].credits);
+  const c = P.ascensionCost(cfg, col, res.familiarId), ranks = cfg.ascension.ranks;
   $('revMsg').innerHTML = res.first
     ? `New familiar. Ability unlocked: <b>${ab.name}</b>. Equip it from the Battle tab.`
-    : `Duplicate: +1 credit (${res.credits} total). ${asc.nextAt === null ? 'Enough credits for every Ascension rank.' : `${asc.nextAt - res.credits} more for the next Ascension rank.`}`;
+    : `Duplicate: +1 credit (${res.credits} total). ${c.maxed ? 'Already fully ascended.' : c.short ? `${c.short} more for ${ranks[c.next]}.` : `Ready to Ascend to ${ranks[c.next]} in the Journal.`}`;
+  if (rw) $('revMsg').innerHTML += `<br><b>+${rw.xp} XP · +${rw.gold} Gold${rw.essence ? ` · +${rw.essence} Arcane Essence` : ''}</b>`;
   $('reveal').hidden = false; paused = true;
   showPreview($('revStage'), res.familiarId, TYPE_HEX[f.type]);
   if (tier >= 2) chime(r);
@@ -909,12 +1007,13 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=6')).json();
+    cfg = await (await fetch('data/config.json?v=7')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
     if (!Object.keys(col.owned).length) Col.grantStarters(cfg, col, Date.now());
     saveCol();
+    prof = P.loadProfile(cfg, store.get('tc.profile', null));
     if (!loadout || loadout.length !== 3 || loadout.some((f) => !col.owned[f])) loadout = [...cfg.starters];
     renderLegend();
     setInterval(tickWilds, 1000);

@@ -1,5 +1,5 @@
 {
-  "version": "m6a-0.1",
+  "version": "m3-1.0",
   "player": {
     "health": 1000,
     "mana": 100,
@@ -438,7 +438,8 @@
       "Empowered",
       "Ascended",
       "Mastered"
-    ]
+    ],
+    "note": "incrementalCredits[r] = credits to go from rank r-1 to r (GDD \u00a76). Universal Essence substitutes at progression.ascension.essencePerCredit."
   },
   "starters": [
     "fam_spirit_demon",
@@ -460,5 +461,232 @@
       "lon": -0.1337
     },
     "demoWalkMps": 6
+  },
+  "progression": {
+    "levelCap": 50,
+    "xpCurve": {
+      "base": 120,
+      "growth": 1.11
+    },
+    "battle": {
+      "xpPerKill": 14,
+      "xpPerWave": 40,
+      "goldPerKill": 6,
+      "goldPerWave": 20,
+      "essencePerWave": 3,
+      "maxWavesRewarded": 12,
+      "minKillsForReward": 1
+    },
+    "binding": {
+      "firstXp": 60,
+      "dupeXp": 15,
+      "firstGold": 25,
+      "dupeGold": 10,
+      "dupeEssence": 2
+    },
+    "mastery": {
+      "cumulativeXp": [
+        0,
+        100,
+        250,
+        500,
+        850,
+        1350,
+        2000,
+        2850,
+        3950,
+        5400
+      ],
+      "participationXp": 20,
+      "xpPerDamage": 0.08,
+      "xpPerAbsorb": 0.08,
+      "xpPerHit": 4,
+      "perBattleCap": 260,
+      "branchAt": 3,
+      "advancedAt": 5
+    },
+    "ascension": {
+      "potencyPerRank": 0.025,
+      "essencePerCredit": 40
+    },
+    "presets": 3
+  },
+  "modifiers": {
+    "mod_bolt_pierce": {
+      "abilityId": "abl_arcane_bolt",
+      "name": "Piercing Bolt",
+      "desc": "Passes through enemies; -20% damage",
+      "set": {
+        "pierce": true
+      },
+      "mult": {
+        "damage": 0.8
+      }
+    },
+    "mod_bolt_quick": {
+      "abilityId": "abl_arcane_bolt",
+      "name": "Quickcast",
+      "desc": "-30% cooldown; -25% damage",
+      "mult": {
+        "cooldown": 0.7,
+        "damage": 0.75
+      }
+    },
+    "mod_blast_wide": {
+      "abilityId": "abl_charged_blast",
+      "name": "Wide Blast",
+      "desc": "+40% size; -15% speed",
+      "mult": {
+        "radius": 1.4,
+        "speed": 0.85
+      }
+    },
+    "mod_blast_swift": {
+      "abilityId": "abl_charged_blast",
+      "name": "Swift Charge",
+      "desc": "-35% charge time; -15% full-charge damage",
+      "mult": {
+        "chargeTime": 0.65,
+        "chargeDamage": 0.85
+      }
+    },
+    "mod_fan_five": {
+      "abilityId": "abl_spark_fan",
+      "name": "Five Sparks",
+      "desc": "5 sparks, wider spread; -30% damage each",
+      "set": {
+        "count": 5
+      },
+      "mult": {
+        "spreadDeg": 1.6,
+        "damage": 0.7
+      }
+    },
+    "mod_fan_focus": {
+      "abilityId": "abl_spark_fan",
+      "name": "Focused Fan",
+      "desc": "Tighter spread, +25% range; +1 s cooldown",
+      "mult": {
+        "spreadDeg": 0.5,
+        "range": 1.25
+      },
+      "add": {
+        "cooldown": 1
+      }
+    },
+    "mod_shield_long": {
+      "abilityId": "abl_rune_shield",
+      "name": "Lasting Ward",
+      "desc": "+60% duration; -25% shield",
+      "mult": {
+        "duration": 1.6,
+        "shield": 0.75
+      }
+    },
+    "mod_shield_burst": {
+      "abilityId": "abl_rune_shield",
+      "name": "Bulwark",
+      "desc": "+35% shield; -40% duration",
+      "mult": {
+        "shield": 1.35,
+        "duration": 0.6
+      }
+    },
+    "mod_circle_big": {
+      "abilityId": "abl_retaliation_circle",
+      "name": "Great Circle",
+      "desc": "+35% radius; -25% damage per second",
+      "mult": {
+        "radius": 1.35,
+        "dps": 0.75
+      }
+    },
+    "mod_circle_hot": {
+      "abilityId": "abl_retaliation_circle",
+      "name": "Searing Circle",
+      "desc": "+40% damage per second; -30% duration",
+      "mult": {
+        "dps": 1.4,
+        "duration": 0.7
+      }
+    },
+    "mod_stone_light": {
+      "abilityId": "abl_stone_skin",
+      "name": "Light Stone",
+      "desc": "Half the slow; -15 points of reduction",
+      "mult": {
+        "slowPct": 0.5
+      },
+      "add": {
+        "damageReductionPct": -15
+      }
+    },
+    "mod_stone_bastion": {
+      "abilityId": "abl_stone_skin",
+      "name": "Bastion",
+      "desc": "+15 points of reduction; +2 s cooldown",
+      "add": {
+        "damageReductionPct": 15,
+        "cooldown": 2
+      }
+    },
+    "mod_dash_far": {
+      "abilityId": "abl_serpent_dash",
+      "name": "Long Strike",
+      "desc": "+40% distance; -20% damage",
+      "mult": {
+        "distance": 1.4,
+        "damage": 0.8
+      }
+    },
+    "mod_dash_fang": {
+      "abilityId": "abl_serpent_dash",
+      "name": "Venom Fang",
+      "desc": "+35% damage; -30% distance",
+      "mult": {
+        "damage": 1.35,
+        "distance": 0.7
+      }
+    },
+    "mod_gust_wide": {
+      "abilityId": "abl_gust",
+      "name": "Gale",
+      "desc": "+40% cone width; -30% knockback",
+      "mult": {
+        "angleDeg": 1.4,
+        "knockback": 0.7
+      }
+    },
+    "mod_gust_push": {
+      "abilityId": "abl_gust",
+      "name": "Hurricane",
+      "desc": "+50% knockback; +1.5 s cooldown",
+      "mult": {
+        "knockback": 1.5
+      },
+      "add": {
+        "cooldown": 1.5
+      }
+    },
+    "mod_ink_thick": {
+      "abilityId": "abl_ink_pool",
+      "name": "Thick Ink",
+      "desc": "+15 points of slow (still capped at 35% total); -30% duration",
+      "add": {
+        "slowPct": 15
+      },
+      "mult": {
+        "duration": 0.7
+      }
+    },
+    "mod_ink_wide": {
+      "abilityId": "abl_ink_pool",
+      "name": "Spreading Ink",
+      "desc": "+35% radius; -40% damage per second",
+      "mult": {
+        "radius": 1.35,
+        "dps": 0.6
+      }
+    }
   }
 }

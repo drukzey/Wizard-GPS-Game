@@ -25,12 +25,13 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
   const P = cfg.player;
   const rng = rngFrom(seed);
   const weapon = cfg.weapons[loadout.weaponId];
-  const slots = loadout.familiarIds.map((fid) => {
+  const slots = loadout.familiarIds.map((fid, i) => {
     const fam = cfg.familiars[fid];
     if (!fam) throw new Error(`Unknown familiar ${fid}`);
-    const ab = cfg.abilities[fam.abilityId];
+    // Progression (ascension potency, mastery modifiers) arrives as a per-slot ability override.
+    const ab = loadout.abilities?.[i] || cfg.abilities[fam.abilityId];
     if (!ab) throw new Error(`Familiar ${fid} references missing ability ${fam.abilityId}`);
-    return { familiarId: fid, fam, ab };
+    return { familiarId: fid, fam, ab, contrib: { damage: 0, absorbed: 0, hits: 0 } };
   });
   if (slots.length !== 3) throw new Error('Loadout needs exactly 3 familiars');
 
@@ -71,16 +72,20 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
     Math.abs(x) > A.halfSize || Math.abs(z) > A.halfSize ||
     A.pillars.some((p) => Math.hypot(x - p.x, z - p.z) < p.r + r);
 
-  function applyDamage(target, amount, source) {
+  // Mastery contribution: credited to the slot whose ability actually did the work.
+  const credit = (i, k, v) => { if (i >= 0 && state.slots[i]) state.slots[i].contrib[k] += v; };
+  function applyDamage(target, amount, source, slot = /^slot\d$/.test(source) ? +source[4] : -1, tick = false) {
     if (target.hp <= 0) return 0;
     if (target.invulnT > 0) { emit({ type: 'dodged', id: target.id, x: target.x, z: target.z }); return 0; }
     let dmg = amount;
-    if (target.stoneT > 0) dmg *= 1 - target.stoneDr / 100;
+    if (target.stoneT > 0) { const cut = dmg * target.stoneDr / 100; dmg -= cut; credit(target.stoneSlot ?? -1, 'absorbed', cut); }
     if (target.shield > 0) {
       const absorbed = Math.min(target.shield, dmg);
       target.shield -= absorbed; dmg -= absorbed;
+      credit(target.shieldSlot ?? -1, 'absorbed', absorbed);
       emit({ type: 'absorbed', id: target.id, amount: absorbed, x: target.x, z: target.z });
     }
+    if (target.team === 'enemy') { credit(slot, 'damage', Math.min(dmg, target.hp)); if (!tick) credit(slot, 'hits', 1); }
     target.hp = Math.max(0, target.hp - dmg);
     emit({ type: 'damage', id: target.id, team: target.team, amount: dmg, source, x: target.x, z: target.z });
     if (target.hp <= 0) {
@@ -147,10 +152,10 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
         }
         break;
       }
-      case 'shield': p.shield = ab.shield; p.shieldT = ab.duration; break;
-      case 'stoneskin': p.stoneT = ab.duration; p.stoneDr = ab.damageReductionPct; p.stoneSlow = ab.slowPct; break;
+      case 'shield': p.shield = ab.shield; p.shieldT = ab.duration; p.shieldSlot = i; break;
+      case 'stoneskin': p.stoneT = ab.duration; p.stoneDr = ab.damageReductionPct; p.stoneSlow = ab.slowPct; p.stoneSlot = i; break;
       case 'dash':
-        p.dash = { dx: aim.x, dz: aim.z, left: ab.distance, speed: ab.distance / ab.duration, damage: ab.damage, width: ab.width, hit: new Set() };
+        p.dash = { dx: aim.x, dz: aim.z, left: ab.distance, speed: ab.distance / ab.duration, damage: ab.damage, width: ab.width, hit: new Set(), slot: i };
         break;
       case 'cone': {
         const half = (ab.angleDeg * Math.PI) / 360;
@@ -201,7 +206,7 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
       p.dash.left -= step;
       for (const e of state.enemies) {
         if (!p.dash.hit.has(e.id) && Math.hypot(e.x - p.x, e.z - p.z) < e.r + p.r + p.dash.width / 2) {
-          p.dash.hit.add(e.id); applyDamage(e, p.dash.damage, 'dash');
+          p.dash.hit.add(e.id); applyDamage(e, p.dash.damage, 'dash', p.dash.slot);
         }
       }
       if (p.dash.left <= 1e-6) p.dash = null;
@@ -317,7 +322,7 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
   function stepZones(dt) {
     state.zones = state.zones.filter((z) => (z.t -= dt) > 0);
     for (const z of state.zones) if (z.dps > 0) for (const e of state.enemies)
-      if (Math.hypot(e.x - z.x, e.z - z.z) < z.radius + e.r) applyDamage(e, z.dps * dt, 'zone');
+      if (Math.hypot(e.x - z.x, e.z - z.z) < z.radius + e.r) applyDamage(e, z.dps * dt, 'zone', z.slot, true);
   }
 
   function step(input = {}, dt = 1 / 60) {
