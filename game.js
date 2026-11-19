@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=32';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=32';
-import * as Col from './collection.js?v=32';
-import * as P from './progression.js?v=32';
-import * as S from './sanctuary.js?v=32';
-import * as Stage from './stage.js?v=32';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=32';
-import * as World from './world.js?v=32';
+import { createSim } from './sim.js?v=33';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=33';
+import * as Col from './collection.js?v=33';
+import * as P from './progression.js?v=33';
+import * as S from './sanctuary.js?v=33';
+import * as Stage from './stage.js?v=33';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=33';
+import * as World from './world.js?v=33';
 
 const $ = (id) => document.getElementById(id);
-const VER = 32; // cache-busting version, kept in step by stamp.py
+const VER = 33; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -121,7 +121,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=32`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=33`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -130,7 +130,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=32')).default, ...(await import('./pub/anims_m5.js?v=32')).default, ...(await import('./pub/anims_custom.js?v=32')).default };
+    const packed = { ...(await import('./pub/anims.js?v=33')).default, ...(await import('./pub/anims_m5.js?v=33')).default, ...(await import('./pub/anims_custom.js?v=33')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -139,14 +139,23 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=32')).default, ...(await import('./pub/models_m4.js?v=32')).default };
+  const models = { ...(await import('./pub/models.js?v=33')).default, ...(await import('./pub/models_m4.js?v=33')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
       if (k === 'fairy') { // wings are separate meshes in the same space: pin them to the upper spine
         obj.updateMatrixWorld(true);
         let spine = null; obj.traverse((o) => { if (/spine_03$/i.test(o.name)) spine = o; });
-        for (const w of ['fairy_wing_l', 'fairy_wing_r']) { const wing = fbx.parse(await gunzipB64(models[w]), ''); obj.add(wing); obj.updateMatrixWorld(true); if (spine) spine.attach(wing); }
+        for (const w of ['fairy_wing_l', 'fairy_wing_r']) {
+          const wing = fbx.parse(await gunzipB64(models[w]), ''); obj.add(wing); obj.updateMatrixWorld(true);
+          if (spine) { // the wing meshes come in at hip height: lift each so its middle sits just below the upper spine, then pin it there
+            const c = new THREE.Box3().setFromObject(wing).getCenter(new THREE.Vector3()), sp = spine.getWorldPosition(new THREE.Vector3());
+            const box = new THREE.Box3().setFromObject(obj), H = box.max.y - box.min.y;
+            const to = c.clone(); to.y = sp.y - H * 0.04;
+            wing.position.add(obj.worldToLocal(to.clone()).sub(obj.worldToLocal(c.clone())));
+            obj.updateMatrixWorld(true); spine.attach(wing);
+          }
+        }
       }
       if (h && !assets.lib) relaxArms(obj);
       assets.models[k] = prep(obj, assets.atlas[atl], h);
@@ -161,7 +170,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=32')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=33')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       const df = name.startsWith('df_'); // Dark Fantasy pieces use their own atlas, and their fire and runes glow
@@ -428,7 +437,7 @@ canvas.addEventListener('pointermove', (e) => {
   if (campTab === 'home') homeHover(e.clientX, e.clientY);
   const p = campPtr.get(e.pointerId); if (!p) return;
   const dx = e.clientX - p.x, dy = e.clientY - p.y; p.x = e.clientX; p.y = e.clientY; campMoved += Math.abs(dx) + Math.abs(dy);
-  if (campPtr.size === 2 && campTab === 'home') { const [a, b] = [...campPtr.values()], d = Math.hypot(a.x - b.x, a.y - b.y); Stage.orbitHome(0, 0, (pinchD - d) * 0.004); pinchD = d; return; }
+  if (campPtr.size === 2) { const [a, b] = [...campPtr.values()], d = Math.hypot(a.x - b.x, a.y - b.y); if (campTab === 'home') Stage.orbitHome(0, 0, (pinchD - d) * 0.004); else Stage.zoomHub((pinchD - d) * 0.004); pinchD = d; return; }
   if (campTab === 'home') Stage.orbitHome(dx, dy, 0); else Stage.spinHub(dx * 0.008);
 });
 const campUp = (e) => {
@@ -437,7 +446,7 @@ const campUp = (e) => {
   if (campMoved < 8 && campTab === 'home' && e.type === 'pointerup') homeTap(e.clientX, e.clientY);
 };
 canvas.addEventListener('pointerup', campUp); canvas.addEventListener('pointercancel', campUp);
-canvas.addEventListener('wheel', (e) => { if (campOpen() && campTab === 'home') { e.preventDefault(); Stage.orbitHome(0, 0, e.deltaY * 0.001); } }, { passive: false });
+canvas.addEventListener('wheel', (e) => { if (!campOpen()) return; e.preventDefault(); if (campTab === 'home') Stage.orbitHome(0, 0, e.deltaY * 0.001); else Stage.zoomHub(e.deltaY * 0.001); }, { passive: false });
 canvas.addEventListener('pointerdown', (e) => {
   if (campOpen() || e.pointerType === 'mouse') return;
   const s = stickFor(e.clientX); if (s.id !== null) return;
@@ -1491,7 +1500,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=32')).json();
+    cfg = await (await fetch('data/config.json?v=33')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));

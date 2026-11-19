@@ -613,7 +613,7 @@
       "lat": 51.50435,
       "lon": -0.14355
     },
-    "demoWalkMps": 6,
+    "demoWalkMps": 3.5,
     "riftCellM": 450,
     "riftRadiusM": 60,
     "portalBonus": 1.5

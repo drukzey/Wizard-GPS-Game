@@ -27,7 +27,7 @@ function makeLights(scene, key = 0xffd9a0, rim = 0x7fd6c4) {
 }
 
 // ---------- camp stage: the wizard, their gear and their three familiars ----------
-export const hub = { scene: null, cam: null, wizard: null, staff: null, team: [], teamIds: [], weaponModel: null, yaw: 0.35, yawV: 0, platform: null, motes: null };
+export const hub = { scene: null, cam: null, wizard: null, staff: null, team: [], teamIds: [], weaponModel: null, yaw: 0.35, yawV: 0, platform: null, motes: null, zoom: 1 };
 
 export function buildHub() {
   const s = hub.scene = new THREE.Scene();
@@ -93,6 +93,7 @@ export async function setHubLoadout(teamIds, weaponModel) {
 }
 
 /** Frame the stage around the open sheet: wizard sits above a bottom sheet (portrait) or left of a side panel (landscape). */
+export function zoomHub(dz) { hub.zoom = Math.max(0.4, Math.min(1.8, hub.zoom * (1 + dz))); }
 export function renderHub(renderer, dt, t, layout) {
   const w = innerWidth, h = innerHeight, c = hub.cam;
   c.aspect = w / h;
@@ -101,10 +102,11 @@ export function renderHub(renderer, dt, t, layout) {
   // pull back so the whole platform fits in the part of the screen the sheet leaves free
   const free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
   const k = Math.min(2.8, 1.15 / Math.max(0.35, free));
+  const z = hub.zoom, close = Math.max(0, 1 - z) / 0.6; // pinch or wheel: 0.4 (face and hands) to 1.8 (whole platform)
   if (hub.focus === 'wizard') { // the profile view: your wizard alone in the middle, close enough to see the staff
-    c.position.set(0, 1.45, (portrait ? 5.4 : 4.6) * Math.min(1.8, k)); c.lookAt(0, 1.0, 0);
+    const ly = 1.0 + close * 0.35; c.position.set(0, ly + 0.45 - close * 0.2, (portrait ? 5.4 : 4.6) * Math.min(1.8, k) * z); c.lookAt(0, ly, 0);
   } else { // the team: three familiars side by side, framed to fill the free part of the screen
-    c.position.set(0, 2.2, (portrait ? 11.5 : 8.6) * Math.min(2.2, k)); c.lookAt(0, 1.1, 0);
+    c.position.set(0, 2.2, (portrait ? 11.5 : 8.6) * Math.min(2.2, k) * z); c.lookAt(0, 1.1, 0);
   }
   c.clearViewOffset();
   if (layout.sheet) {

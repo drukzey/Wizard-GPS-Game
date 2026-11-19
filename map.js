@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=32';
-import * as Col from './collection.js?v=32';
+import * as World from './world.js?v=33';
+import * as Col from './collection.js?v=33';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -135,11 +135,13 @@ const layer3d = {
     const l = new THREE.Matrix4().makeTranslation(o.x, o.y, o.z).scale(new THREE.Vector3(s, -s, s)).multiply(new THREE.Matrix4().makeRotationX(Math.PI / 2));
     g3.cam.projectionMatrix = m.multiply(l);
     if (g3.wizard) {
-      const p = local(st.pos); g3.wizard.position.set(p.x, 0, p.z);
-      const tgt = st.heading; let d = tgt - g3.wizard.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g3.wizard.rotation.y += d * Math.min(1, dt * 8);
+      const p = local(st.view || st.pos); g3.wizard.position.set(p.x, 0, p.z);
+      const tgt = st.heading; let d = tgt - g3.wizard.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d)); g3.wizard.rotation.y += d * Math.min(1, dt * 10);
       const an = g3.wizard.userData.anim;
-      if (an) { const run = st.moving > 0 ? 1 : 0; an.setLoco({ idle: 1 - run, walk: run, stance: 0 }, 1); an.update(dt); }
-      st.moving = Math.max(0, st.moving - dt);
+      if (an) { // blend idle and walk smoothly; the walk speeds up with the pace so feet don't slide
+        st.walkW = (st.walkW || 0) + ((st.moving > 0 ? 1 : 0) - (st.walkW || 0)) * Math.min(1, dt * 8);
+        an.setLoco({ idle: 1 - st.walkW, walk: st.walkW, stance: 0 }, st.moving > 0 ? Math.min(2.2, Math.max(0.9, (st.speed || 1.4) / 1.4)) : 1); an.update(dt);
+      }
       g3.ring.position.set(p.x, 0.15, p.z); g3.ring.rotation.z = t * 0.4;
     }
     for (const th of g3.things.values()) {
@@ -334,13 +336,10 @@ function startDemo(reason) {
 }
 function setPosition(lat, lon, acc, tooFast) {
   const first = !st.pos, prev = st.pos;
-  if (prev) {
-    const d = World.distanceM(prev, { lat, lon });
-    if (d > 0.3) { st.heading = Math.atan2((lon - prev.lon) * Math.cos((lat * Math.PI) / 180), -(lat - prev.lat)); st.moving = 0.6; } // facing +z (south) is 0
-  }
   st.pos = { lat, lon }; st.acc = acc; st.tooFast = tooFast;
+  if (!st.view || World.distanceM(st.view, st.pos) > 60) st.view = { ...st.pos }; // big GPS jumps snap; small ones are walked
   if (!st.map) return;
-  st.map.jumpTo({ center: [lon, lat], ...(first ? { zoom: ZOOM } : {}) });
+  if (first) st.map.jumpTo({ center: [lon, lat], zoom: ZOOM });
   const src = st.map.getSource('reach');
   if (src) src.setData({ type: 'FeatureCollection', features: [circle(lat, lon, H.cfg.world.interactRadiusM)] });
   $('speedWarn').hidden = !tooFast;
@@ -356,9 +355,10 @@ function scan(force) {
   if (!force && now - st.lastScan < 1500) { refreshRanges(); return; }
   st.lastScan = now;
   const W = H.cfg.world, col = H.col();
+  st.buildings = buildingsNear();
   const spawns = World.nearbySpawns(H.cfg, st.pos, now, W.viewRadiusM).filter((s) => !col.closed.includes(s.id) && !safeSkip(s));
-  const sites = World.riftSites(H.cfg, st.pos, W.viewRadiusM * 1.5);
-  const shrineSites = World.shrineSites(H.cfg, st.pos, W.viewRadiusM, pois());
+  const sites = World.riftSites(H.cfg, st.pos, W.viewRadiusM * 1.5).filter((s) => !insideBuilding(s));
+  const shrineSites = World.shrineSites(H.cfg, st.pos, W.viewRadiusM, pois().filter((q) => !insideBuilding(q))).filter((s) => !insideBuilding(s));
   const keep = new Set([...spawns.map((s) => s.id), ...sites.map((s) => s.id), ...shrineSites.map((s) => s.id)]);
   for (const [id, m] of [...st.markers, ...st.rifts, ...st.shrines]) if (!keep.has(id)) { m.remove(); st.markers.delete(id); st.rifts.delete(id); st.shrines.delete(id); removeThing(id); }
   for (const s of shrineSites) if (!st.shrines.has(s.id)) { st.shrines.set(s.id, hitMarker(s, () => tapShrine(s), s.name || H.cfg.shrines.types[s.type].name, 'shrine')); addShrine3d(s); }
@@ -369,7 +369,24 @@ function scan(force) {
   refreshRanges(); H.onNearby();
 }
 // Don't place familiars on water or roads (GDD §11). Only checkable for points the map has drawn.
+// Building footprints from the map tiles, refreshed each scan, so nothing stands inside a house.
+function buildingsNear() {
+  try { return st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'building' }).map((f) => f.geometry).filter((g) => g && /Polygon/.test(g.type)); } catch { return []; }
+}
+function inRing(x, y, ring) { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; }
+function insideBuilding(p) {
+  for (const g of st.buildings || []) {
+    for (const poly of g.type === 'Polygon' ? [g.coordinates] : g.coordinates) {
+      const r = poly[0]; if (!r || r.length < 3) continue;
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity; for (const [x, y] of r) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+      if (p.lon < minX || p.lon > maxX || p.lat < minY || p.lat > maxY) continue;
+      if (inRing(p.lon, p.lat, r)) return true;
+    }
+  }
+  return false;
+}
 function safeSkip(s) {
+  if (insideBuilding(s)) return true;
   const p = st.map.project([s.lon, s.lat]), c = st.map.getCanvas();
   if (p.x < 0 || p.y < 0 || p.x > c.clientWidth || p.y > c.clientHeight) return false;
   const feats = st.map.queryRenderedFeatures([[p.x - 3, p.y - 3], [p.x + 3, p.y + 3]]);
@@ -445,9 +462,25 @@ function orbitControls(el) {
   el.addEventListener('pointerup', up); el.addEventListener('pointercancel', up);
 }
 
+/** The drawn wizard walks toward the logical position at walking pace (faster to catch up), facing the way it goes; the map follows it. */
+function walkView(dt) {
+  if (!st.view) st.view = { ...st.pos };
+  const d = World.distanceM(st.view, st.pos);
+  if (d > 0.05) {
+    const speed = Math.max(1.6, Math.min(12, d * 1.2)), k = Math.min(1, (speed * dt) / d);
+    const dLat = st.pos.lat - st.view.lat, dLon = st.pos.lon - st.view.lon;
+    st.heading = Math.atan2(dLon * Math.cos((st.view.lat * Math.PI) / 180), -dLat); // facing +z (south) is 0
+    st.view = { lat: st.view.lat + dLat * k, lon: st.view.lon + dLon * k }; st.speed = speed;
+    st.moving = 0.25;
+    st.map.jumpTo({ center: [st.view.lon, st.view.lat] });
+  }
+  st.moving = Math.max(0, st.moving - dt);
+}
+
 // Demo walking and periodic rescans
 export function tickWorld(dt) {
   if (!st.open || !st.pos) return;
+  walkView(dt);
   if (st.demo && st.demoTarget) {
     const d = World.distanceM(st.pos, st.demoTarget), step = H.cfg.world.demoWalkMps * dt;
     if (d <= step) { setPosition(st.demoTarget.lat, st.demoTarget.lon, 5, false); st.demoTarget = null; }
