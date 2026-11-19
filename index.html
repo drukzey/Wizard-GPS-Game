@@ -282,6 +282,91 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
   .card2{flex-wrap:wrap}.card2>.btn{margin-left:auto}
   h2{font-size:20px;flex-wrap:wrap}
 }
+/* ===== map-first layout ===== */
+#world{position:fixed;inset:0;z-index:1;background:#24302a}
+#c{z-index:2} body.mapHome #c{visibility:hidden}
+.hud{z-index:3}.camp{z-index:4}.tomeMenu{z-index:5}.overlay,.encounter{z-index:6}
+.mapShade{position:absolute;inset:0;pointer-events:none;background:linear-gradient(#0d1312 0%,#0d131200 20%),radial-gradient(ellipse at 50% 60%,transparent 55%,#0a0e0dcc 100%)}
+.mapTop{position:absolute;top:max(10px,env(safe-area-inset-top));right:12px;left:12px;display:flex;justify-content:flex-end;align-items:center;gap:8px;pointer-events:none}
+.mapTop>*{pointer-events:auto}
+.chip{font:600 14px var(--body);color:var(--bone);background:#0b0f0ee0;border:1px solid #3b4245;padding:6px 12px;border-radius:20px}
+.roundBtn{width:56px;height:56px;border:0;cursor:pointer;background:var(--u-f_ring) center/contain no-repeat,radial-gradient(circle,#161c1d 58%,transparent 60%);display:flex;align-items:center;justify-content:center;color:var(--bone);font:700 18px var(--body)}
+.roundBtn.sm{width:46px;height:46px}.roundBtn .sprite{width:22px;height:22px}
+.avatarBtn{position:absolute;left:14px;bottom:calc(16px + env(safe-area-inset-bottom));width:86px;height:86px;border:0;padding:0;background:none;cursor:pointer}
+.avatarBtn img{position:absolute;inset:9px;width:68px;height:68px;border-radius:50%;object-fit:cover;background:radial-gradient(#3a4a44,#141a1a);box-shadow:inset 0 0 0 2px #000}
+.xpRing{position:absolute;inset:3px;border-radius:50%;background:conic-gradient(var(--brass) var(--xp,0%),#ffffff1c 0);-webkit-mask:radial-gradient(circle,transparent 36px,#000 37px);mask:radial-gradient(circle,transparent 36px,#000 37px)}
+.avatarBtn::after{content:'';position:absolute;inset:-4px;background:var(--u-f_ring) center/contain no-repeat;pointer-events:none}
+.lvBadge{position:absolute;right:-2px;bottom:-2px;z-index:1;min-width:30px;height:30px;padding:0 6px;display:flex;align-items:center;justify-content:center;font:700 17px var(--display);color:var(--bone);background:linear-gradient(#7a2a22,#41140f);border:2px solid #d7b26b;border-radius:15px}
+.tomeBtn{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(14px + env(safe-area-inset-bottom));width:96px;height:96px;border:0;cursor:pointer;
+  background:var(--u-f_ring) center/contain no-repeat,radial-gradient(circle,#c8463a 0,#6a1d16 42%,#160b09 62%,transparent 64%);filter:drop-shadow(0 4px 10px #000c);display:flex;align-items:center;justify-content:center}
+.tomeBtn .sprite{width:44px;height:44px;filter:drop-shadow(0 2px 3px #000)}
+.tomeBtn:active,.avatarBtn:active,.nearbyBtn:active{transform:translateX(var(--tx,0)) scale(.95)}.tomeBtn{--tx:-50%}
+.nearbyBtn{position:absolute;right:14px;bottom:calc(22px + env(safe-area-inset-bottom));min-width:118px;height:72px;padding:6px 10px;border:14px solid transparent;border-image:var(--u-f_card2) 60 / 14px stretch;background:#121718f0 padding-box;cursor:pointer;color:var(--bone);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.nearFaces{display:flex;gap:2px}.nearFaces img{width:30px;height:30px;border-radius:50%;object-fit:cover;background:#0b0f0e;box-shadow:0 0 0 1px #3b4245}
+.nearFaces img.unknown{filter:brightness(0) drop-shadow(0 0 1px #9aa39e)}
+.nearbyBtn small{font:600 12px var(--body);color:var(--ash)}
+.nearbyPanel{position:absolute;right:10px;bottom:calc(104px + env(safe-area-inset-bottom));width:min(380px,calc(100vw - 20px));max-height:62vh;overflow:auto;touch-action:pan-y}
+.npHead{display:flex;align-items:center;justify-content:space-between;margin:2px 0 6px}
+.nearRow{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:8px;background:#0f1314;border:1px solid #2c3335;border-left:3px solid var(--rc);color:var(--bone);cursor:pointer;margin-bottom:6px;font:inherit}
+.nearRow img{width:48px;height:48px;border-radius:50%;object-fit:cover;background:#0b0f0e}
+.nearRow img.unknown{filter:brightness(0) drop-shadow(0 0 1px #9aa39e)}
+.nearRow b{font:700 17px var(--display);display:block}.nearRow .grow{flex:1;min-width:0}
+.nearRow .tag{margin-left:auto}
+.hit{width:70px;height:100px;border:0;background:none;padding:0;cursor:pointer;position:relative}
+.hit.rift{width:120px;height:150px}
+.hit em{position:absolute;left:50%;top:-6px;transform:translateX(-50%);font:600 13px var(--body);font-style:normal;color:var(--bone);background:#0b0f0ee6;border:1px solid #d7b26b88;padding:2px 8px;white-space:nowrap;display:none;border-radius:2px}
+.hit.near em,.hit:hover em,.hit:focus-visible em{display:block}
+.hit:focus-visible{outline:2px solid var(--brass)}
+.wmsg{position:absolute;top:70px;left:50%;transform:translateX(-50%);max-width:92vw;background:#0b0f0ee6;border:1px solid #3b4245;padding:9px 14px;font:600 14px var(--body);text-align:center}
+.locgps{position:absolute;top:calc(64px + env(safe-area-inset-top));right:12px;cursor:pointer}
+.lochelp{position:absolute;left:50%;top:80px;transform:translateX(-50%);width:min(460px,92vw);z-index:2}
+.lochelp>b{font:700 20px var(--display)}
+/* Tome menu */
+.tomeMenu{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:20px 16px 120px;background:radial-gradient(ellipse at 50% 70%,#1c2422f2,#070a0af7 75%);backdrop-filter:blur(3px)}
+.tomeMenu[hidden]{display:none}
+.tmHead{position:absolute;top:max(14px,env(safe-area-inset-top));right:14px}
+.tmGrid{display:grid;grid-template-columns:repeat(3,minmax(0,170px));gap:10px;width:100%;justify-content:center}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:150px;cursor:pointer;color:var(--bone);border:18px solid transparent;border-image:var(--u-f_card2) 60 / 18px stretch;background:linear-gradient(#1d2426,#121718) padding-box;padding:4px}
+.tile .sprite{width:62px;height:62px;filter:drop-shadow(0 3px 6px #000)}
+.tile b{font:700 21px var(--display)}.tile small{font:500 13px var(--body);color:var(--ash);text-align:center}
+.tile:hover{background:linear-gradient(#2a1612,#171010) padding-box}
+.tile:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+.closeX{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom));width:66px;height:66px;border:0;cursor:pointer;z-index:1;
+  background:var(--u-f_ring) center/contain no-repeat,radial-gradient(circle,#2a3133 0,#121718 58%,transparent 60%);color:var(--bone);font:700 22px var(--body);filter:drop-shadow(0 3px 8px #000)}
+@media (max-width:600px){.tmGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.tile{min-height:128px}.tile .sprite{width:52px;height:52px}}
+/* pages */
+.pageHead{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:12px;padding:max(12px,env(safe-area-inset-top)) 16px 0;pointer-events:none}
+.pageHead>*{pointer-events:auto}
+.pageHead h1{font-size:34px;text-shadow:0 2px 8px #000}
+.pageHead .purse{margin-left:auto}
+.camp .sheet{bottom:calc(96px + env(safe-area-inset-bottom))}
+.camp.full{background:radial-gradient(ellipse at 50% 0%,#1d2527,#0b0f10 70%)}
+.camp.full .sheet{top:72px;height:auto;left:50%;right:auto;width:min(760px,100%);transform:translateX(-50%);border-bottom:22px solid transparent;border-image:var(--u-f_card2) 60 / 22px stretch}
+@media (min-width:900px) and (min-aspect-ratio:1/1){
+  .camp .sheet{bottom:96px}
+  .camp.full .sheet{left:50%;right:auto;width:min(760px,96vw);border:22px solid transparent;border-image:var(--u-f_card2) 60 / 22px stretch}
+}
+@media (max-width:600px){.camp.full .sheet{border-width:16px 14px;border-image-width:16px 14px}}
+/* encounter */
+.encounter{position:fixed;inset:0;background:#141b1b;touch-action:none}
+.encounter[hidden]{display:none}
+.encStage{position:absolute;inset:0}
+.encStage #bindPrev{position:absolute;inset:0!important;width:100%!important;height:100%!important;border-radius:0}
+.encStage #bindRing{position:absolute;left:50%;top:54%;width:min(86vw,58vh);height:min(86vw,58vh);transform:translate(-50%,-50%);pointer-events:none}
+.encTop{position:absolute;top:max(18px,env(safe-area-inset-top));left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:4px;text-align:center;pointer-events:none;text-shadow:0 2px 8px #000}
+.encBottom{position:absolute;bottom:calc(22px + env(safe-area-inset-bottom));left:0;right:0;display:flex;flex-direction:column;align-items:center;gap:10px;padding:0 100px;text-align:center}
+.encBottom .bindInfo{color:var(--bone);text-shadow:0 1px 4px #000;max-width:520px}
+.runBtn{position:absolute;left:14px;bottom:calc(22px + env(safe-area-inset-bottom));width:64px;height:64px;border:0;cursor:pointer;background:var(--u-f_ring) center/contain no-repeat,radial-gradient(circle,#2a3133 0,#121718 58%,transparent 60%);display:flex;flex-direction:column;align-items:center;justify-content:center;color:var(--bone)}
+.runBtn small{font:600 11px var(--body)}.runBtn .sprite{width:22px;height:22px}
+@media (max-width:600px){.encBottom{padding:0 16px 0 90px}}
+.famIco.pic{width:54px;height:54px;position:relative;background:radial-gradient(circle at 50% 35%,#3a4a46,#0d1112);box-shadow:0 0 0 2px #000a,0 0 0 3px var(--c)}
+.famIco.pic img{width:100%;height:100%;border-radius:50%;object-fit:cover}
+.famIco.unknown{box-shadow:0 0 0 2px #000a,0 0 0 3px #444}.famIco.unknown img{filter:brightness(0) drop-shadow(0 0 1px #9aa39e)}
+.abBadge{position:absolute;right:-5px;bottom:-5px;width:24px;height:24px;border-radius:50%;background:#0b0f0e;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1.5px var(--c);font-style:normal}
+.abBadge .ico{width:15px;height:15px}
+.slotR img.pt{width:64px;height:64px;border-radius:50%;object-fit:cover;background:radial-gradient(circle at 50% 35%,#3a4a46,#0d1112)}
+.slotR .abBadge{right:2px;bottom:4px}
+.pick{padding:10px 12px}.jc .famIco.pic{width:64px;height:64px}
 </style>
 </head>
 <body>
@@ -304,48 +389,73 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
   <div class="hint">WASD move · mouse aim · hold left click to fire · Q E R abilities · Space dodge</div>
 </div>
 
-<div class="camp" id="menu" hidden>
-  <header class="campTop">
-    <button class="who" id="whoBtn" aria-label="Your wizard"><span class="lvRing" id="lvT">1</span>
-      <span class="whoTxt"><b>Wizard</b><span class="xp"><i id="xpI"></i></span><small id="xpT"></small></span></button>
-    <div class="purse" id="wallet"></div>
-    <button class="iconBtn" id="setBtn" aria-label="Settings and controls"><span class="sprite" style="--m:var(--u-n_settings)"></span></button>
-  </header>
+<div id="world" hidden>
+  <div id="worldMap"></div>
+  <div class="mapShade" aria-hidden="true"></div>
+  <div class="mapTop">
+    <span class="chip" id="worldStatus">Map</span>
+    <button class="roundBtn sm" id="recenter" aria-label="Centre the map on me"><span class="sprite" style="--m:var(--u-n_map)"></span></button>
+  </div>
+  <button class="avatarBtn" id="avatarBtn" aria-label="Your wizard"><span class="xpRing" id="xpRing"></span><img id="avatarImg" alt=""><span class="lvBadge" id="lvT">1</span></button>
+  <button class="tomeBtn" id="tomeBtn" aria-label="Open the Tome"><span class="sprite" style="--m:var(--u-n_journal)"></span></button>
+  <button class="nearbyBtn" id="nearbyBtn" aria-label="Nearby familiars"><span class="nearFaces" id="nearFaces"></span><small id="nearCount">Nearby</small></button>
+  <div class="nearbyPanel fr" id="nearbyPanel" hidden>
+    <div class="npHead"><h3>Nearby</h3><button class="roundBtn sm" id="nearbyClose" aria-label="Close nearby">✕</button></div>
+    <div id="nearList"></div>
+  </div>
+  <div class="wmsg" id="worldMsg" hidden></div>
+  <div class="lochelp fr" id="locHelp" hidden><b>Location needed</b><p id="locText"></p>
+    <div class="actions"><button class="btn" id="locRetry">Try again</button><button class="btn alt" id="locDemo">Use demo mode</button></div></div>
+  <button class="chip locgps" id="locGps" hidden>Use real GPS</button>
+  <div class="wwarn" id="speedWarn" hidden>Moving too fast. Familiar interactions are paused. Never play while driving.</div>
+  <div class="overlay" id="safety" hidden><div class="card fr" style="max-width:520px;margin-top:10vh">
+    <h1 style="font-size:32px">Before you explore</h1>
+    <p>Tomecraft uses your phone's location to place familiars and rifts around you. Your location stays on this device and is never sent anywhere.</p>
+    <p><b style="color:var(--text)">Stay safe:</b> watch where you're walking, keep to public places and paths, don't trespass, and never play while driving or cycling. Familiar interactions pause when you're moving fast.</p>
+    <div class="actions"><button class="btn" id="safetyOk">Use my location</button><button class="btn alt" id="demoBtn">Demo mode (no GPS)</button></div>
+  </div></div>
+</div>
 
+<div class="tomeMenu" id="tomeMenu" hidden>
+  <div class="tmHead"><div class="purse" id="tmPurse"></div></div>
+  <div class="tmGrid">
+    <button class="tile" data-go="battle"><span class="sprite" style="--m:var(--u-n_play)"></span><b>Battle</b><small>Rifts and training</small></button>
+    <button class="tile" data-go="familiars"><span class="sprite" style="--m:var(--u-n_chamber)"></span><b>Familiars</b><small>Your team</small></button>
+    <button class="tile" data-go="wizard"><span class="sprite" style="--m:var(--u-n_wizard)"></span><b>Wizard</b><small>Gear and bag</small></button>
+    <button class="tile" data-go="home"><span class="sprite" style="--m:var(--u-n_home)"></span><b>Sanctuary</b><small>Your home</small></button>
+    <button class="tile" data-go="journal"><span class="sprite" style="--m:var(--u-n_scroll)"></span><b>Journal</b><small>Collection and research</small></button>
+    <button class="tile" data-go="settings"><span class="sprite" style="--m:var(--u-n_settings)"></span><b>Settings</b><small>Motion, sound, controls</small></button>
+  </div>
+  <button class="closeX" id="tomeClose" aria-label="Close the Tome">✕</button>
+</div>
+
+<div class="camp" id="menu" hidden>
+  <header class="pageHead"><h1 id="pageTitle"></h1><div class="purse" id="wallet"></div></header>
   <section class="sheet" id="sheet">
     <span class="sheetCrest" aria-hidden="true"></span>
 
-    <div class="pane" id="pane-play">
+    <div class="pane" id="pane-battle">
       <div id="resumeBox"></div>
       <h2>Rifts <span class="comp">fixed waves, a bonus when you clear them</span></h2>
+      <p class="s">Portals on the map open these rifts with a 50% bigger clear bonus. You can also enter from here, wherever you are.</p>
       <div class="cards" id="rifts"></div>
       <h2>Training</h2>
       <div class="fr quiet"><div class="card2"><div class="grow"><h3>Endless waves</h3><p>Practise with your current team. Waves keep coming and get tougher. End the run whenever you like to collect what you've earned.</p></div>
         <button class="btn sm go" id="startBtn">Start</button></div></div>
-      <details class="help"><summary>Controls</summary>
-        <table><tr><td>Phone</td><td>Left thumb moves. Right thumb aims and fires. Tap an ability to cast where you aim, or drag from it to aim that ability. Placed abilities land where you drag to.</td></tr>
-        <tr><td>Keyboard</td><td>WASD to move, mouse to aim, hold left click to fire, Q E R for abilities (hold for Charged Blast), Space to dodge.</td></tr></table>
-        <p>Every attack goes exactly where you aim. There is no aim assist.</p></details>
     </div>
 
-    <div class="pane" id="pane-explore" hidden>
-      <div class="fr"><div class="card2 hero"><span class="sprite" style="--m:var(--u-n_map)"></span><div class="grow"><h3>World map</h3><p>Walk around for real to find familiars near you.</p></div>
-        <button class="btn sm go" id="openMap">Open map</button></div></div>
-      <h2>Nearby familiars <span class="comp" id="nextT"></span></h2>
-      <div class="encList" id="encList"></div>
+    <div class="pane" id="pane-familiars" hidden>
+      <div class="slots" id="teamSlots"></div>
+      <p class="s" style="text-align:center;margin-top:26px"><span id="compT"></span> <span id="pickT"></span></p>
+      <h2>Your familiars <span class="comp">tap to add or remove</span></h2>
+      <div class="picks" id="famGrid"></div>
+      <h2>Saved teams</h2>
+      <div class="rows" id="presets"></div>
     </div>
 
     <div class="pane" id="pane-wizard" hidden>
-      <div class="seg" role="tablist"><button class="on" data-seg="team">Team</button><button data-seg="gear">Gear</button><button data-seg="bag">Bag</button></div>
-      <div id="seg-team">
-        <div class="slots" id="teamSlots"></div>
-        <p class="s" style="text-align:center;margin-top:24px"><span id="compT"></span> <span id="pickT"></span></p>
-        <h2>Your familiars <span class="comp">tap to add or remove</span></h2>
-        <div class="picks" id="famGrid"></div>
-        <h2>Saved teams</h2>
-        <div class="rows" id="presets"></div>
-      </div>
-      <div id="seg-gear" hidden>
+      <div class="seg" role="tablist"><button class="on" data-seg="gear">Gear</button><button data-seg="bag">Bag</button></div>
+      <div id="seg-gear">
         <div class="gearRow" id="gearSlots"></div>
         <div id="gearList"></div>
         <h2>With this gear</h2>
@@ -357,9 +467,7 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
       </div>
     </div>
 
-    <div class="pane" id="pane-home" hidden>
-      <div id="homeBody"></div>
-    </div>
+    <div class="pane" id="pane-home" hidden><div id="homeBody"></div></div>
 
     <div class="pane" id="pane-journal" hidden>
       <h2>Collection <span class="comp" id="colT"></span></h2>
@@ -371,14 +479,12 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
       <p class="s">Prototype. Models, animations and interface art come from your Synty packs. Numbers are test values from <code>data/config.json</code>.</p>
     </div>
   </section>
+  <button class="closeX" id="pageClose" aria-label="Back to the map">✕</button>
+</div>
 
-  <nav class="dock" role="tablist" aria-label="Camp">
-    <button class="tab" data-tab="explore" role="tab"><span class="sprite" style="--m:var(--u-n_map)"></span>Map<span class="dot"></span></button>
-    <button class="tab on" data-tab="play" role="tab"><span class="sprite" style="--m:var(--u-n_play)"></span>Play</button>
-    <button class="tab" data-tab="wizard" role="tab"><span class="sprite" style="--m:var(--u-n_wizard)"></span>Wizard</button>
-    <button class="tab" data-tab="home" role="tab"><span class="sprite" style="--m:var(--u-n_home)"></span>Sanctuary</button>
-    <button class="tab" data-tab="journal" role="tab"><span class="sprite" style="--m:var(--u-n_journal)"></span>Journal</button>
-  </nav>
+<div class="overlay" id="riftOv" hidden>
+  <div class="card fr" style="margin-top:12vh;max-width:520px"><div id="riftBody"></div>
+    <div class="actions"><button class="btn" id="riftGo">Enter rift</button><button class="btn alt" id="riftClose">Not now</button></div></div>
 </div>
 
 <div class="overlay" id="settingsOv" hidden>
@@ -412,18 +518,14 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
   </div>
 </div>
 
-<div class="overlay" id="bind" hidden>
-  <div class="card bindWrap" id="bindCard">
-    <span class="rbadge" id="bindBadge"></span>
-    <div class="bindTitle" id="bindName"></div>
-    <div class="bindInfo" id="bindType"></div>
-    <div class="bindStage" id="bindStage"><canvas id="bindRing" width="680" height="680"></canvas></div>
+<div class="encounter" id="bind" hidden>
+  <div class="encStage" id="bindStage"><canvas id="bindRing" width="680" height="680"></canvas></div>
+  <div class="encTop" id="bindCard"><span class="rbadge" id="bindBadge"></span><div class="bindTitle" id="bindName"></div><div class="bindInfo" id="bindType"></div></div>
+  <div class="encBottom">
     <div class="bindInfo" id="bindMsg">Tap when the light passes through the glowing arc.</div>
-    <div class="actions" style="justify-content:center">
-      <button class="btn" id="bindGo">Begin binding</button>
-      <button class="btn alt" id="bindLeave">Leave</button>
-    </div>
+    <button class="btn" id="bindGo">Begin binding</button>
   </div>
+  <button class="runBtn" id="bindLeave" aria-label="Run away"><span class="sprite" style="--m:var(--u-n_map)"></span><small>Run</small></button>
 </div>
 <div class="overlay" id="reveal" hidden>
   <div class="card bindWrap reveal" id="revealCard">
@@ -435,23 +537,8 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
     <div class="actions" style="justify-content:center"><button class="btn" id="revOk">Continue</button></div>
   </div>
 </div>
-<div id="world" hidden>
-  <div id="worldMap"></div>
-  <div class="wbar"><button class="wbtn" id="worldBack" aria-label="Back to camp">‹ Camp</button><span id="worldStatus">Map</span><button class="wbtn" id="recenter" aria-label="Centre on me">◎</button></div>
-  <div class="wmsg" id="worldMsg">Loading the map…</div>
-  <div class="lochelp" id="locHelp" hidden><b>Location needed</b><p id="locText"></p>
-    <div class="actions"><button class="btn" id="locRetry">Try again</button><button class="btn alt" id="locDemo">Use demo mode</button></div></div>
-  <button class="wbtn locgps" id="locGps" hidden>Use real GPS</button>
-  <div class="wwarn" id="speedWarn" hidden>Moving too fast. Familiar interactions are paused. Never play while driving.</div>
-  <div class="overlay" id="safety" hidden><div class="card fr" style="max-width:520px;margin-top:10vh">
-    <h1 style="font-size:32px">Before you explore</h1>
-    <p>Tomecraft uses your phone's location to place familiars around you. Your location stays on this device and is never sent anywhere.</p>
-    <p><b style="color:var(--text)">Stay safe:</b> watch where you're walking, keep to public places and paths, don't trespass, and never play while driving or cycling. Familiar interactions pause when you're moving fast.</p>
-    <div class="actions"><button class="btn" id="safetyOk">Use my location</button><button class="btn alt" id="demoBtn">Demo mode (no GPS)</button></div>
-  </div></div>
-</div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=13"></script>
+<script type="module" src="game.js?v=14"></script>
 </body>
 </html>

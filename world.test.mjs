@@ -66,3 +66,13 @@ test('a bound map spawn cannot be bound again; a fled one does not come back', (
   C.pruneEncounters(c, NOW + 3600_000);
   assert.equal(C.registerWorldEncounter(c, W.toEncounter(cfg, s2, NOW)), null);
 });
+
+test('rift portals sit at fixed places, the same for everyone, and only map rifts appear', () => {
+  const pos = cfg.world.demoStart;
+  const a = W.riftSites(cfg, pos, 1500), b = W.riftSites(cfg, { lat: pos.lat + 0.0003, lon: pos.lon }, 1500);
+  assert.ok(a.length > 0);
+  const ids = new Set(b.map((s) => s.id));
+  for (const s of a.filter((x) => x.distance < 1200)) assert.ok(ids.has(s.id), 'stable across small moves');
+  for (const s of a) assert.ok(cfg.rifts.find((r) => r.id === s.riftId).onMap);
+  assert.ok(W.riftInRange(cfg, a[0], a[0]));
+});

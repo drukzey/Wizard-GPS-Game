@@ -613,7 +613,10 @@
       "lat": 51.5027,
       "lon": -0.1337
     },
-    "demoWalkMps": 6
+    "demoWalkMps": 6,
+    "riftCellM": 450,
+    "riftRadiusM": 60,
+    "portalBonus": 1.5
   },
   "progression": {
     "levelCap": 50,
@@ -885,7 +888,8 @@
           "arcaneStone": 1,
           "runeFragments": 1
         }
-      }
+      },
+      "onMap": false
     },
     {
       "id": "rift_shallow",
@@ -916,7 +920,8 @@
           "arcaneStone": 3,
           "runeFragments": 2
         }
-      }
+      },
+      "onMap": true
     },
     {
       "id": "rift_twisting",
@@ -953,7 +958,8 @@
           "arcaneStone": 5,
           "runeFragments": 4
         }
-      }
+      },
+      "onMap": true
     },
     {
       "id": "rift_godfall",
@@ -982,7 +988,8 @@
           "arcaneStone": 10,
           "runeFragments": 8
         }
-      }
+      },
+      "onMap": true
     }
   ],
   "materials": {

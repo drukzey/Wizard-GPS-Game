@@ -1,16 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=13';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=13';
-import * as Col from './collection.js?v=13';
-import * as P from './progression.js?v=13';
-import * as S from './sanctuary.js?v=13';
-import * as Stage from './stage.js?v=13';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=13';
+import { createSim } from './sim.js?v=14';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=14';
+import * as Col from './collection.js?v=14';
+import * as P from './progression.js?v=14';
+import * as S from './sanctuary.js?v=14';
+import * as Stage from './stage.js?v=14';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=14';
+import * as World from './world.js?v=14';
 
 const $ = (id) => document.getElementById(id);
-const VER = 13; // cache-busting version, kept in step by stamp.py
+const VER = 14; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -76,6 +77,7 @@ const UI_SPRITES = ['orbL', 'orbR', 'orbGlass', 'orbSheen', 'ring', 'ringBg', 'b
   'n_play', 'n_journal', 'n_wizard', 'n_home', 'n_map', 'n_settings', 'n_scroll', 'n_medal', 'c_gold', 'c_essence', 'm_rune', 'm_stone', 'm_ore', 'chest',
   's_weapon', 's_robe', 's_boots', 's_amulet', 's_ring', 'n_craft', 'n_research', 'n_forge', 'n_dwelling', 'n_chamber', 'n_library', 'n_lock'];
 const assets = { atlas: {}, models: {}, tex: {}, lib: null };
+const uiSrc = {}, spriteUrl = (k) => uiSrc[k] || '';
 
 async function loadImage(url) {
   const blob = await (await fetch(url)).blob();
@@ -118,8 +120,8 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=13`);
-    document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=14`);
+    document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
   tick('Interface');
@@ -127,7 +129,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=13')).default, ...(await import('./pub/anims_m5.js?v=13')).default };
+    const packed = { ...(await import('./pub/anims.js?v=14')).default, ...(await import('./pub/anims_m5.js?v=14')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -136,7 +138,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=13')).default, ...(await import('./pub/models_m4.js?v=13')).default };
+  const models = { ...(await import('./pub/models.js?v=14')).default, ...(await import('./pub/models_m4.js?v=14')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -158,7 +160,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=13')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=14')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
@@ -183,6 +185,32 @@ function instance(key) {
   }
   return g;
 }
+
+// Portraits: each familiar (and the wizard's face) rendered once from its real model, used across the interface.
+const portraits = {};
+function makePortraits() {
+  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  r.setSize(256, 256, false); r.outputColorSpace = THREE.SRGBColorSpace;
+  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xe8eef0, 0x2a2018, 2.2));
+  const key = new THREE.DirectionalLight(0xffe2b8, 2.2); key.position.set(2, 3, 4); sc.add(key);
+  const rim = new THREE.DirectionalLight(0x7fd6c4, 1.6); rim.position.set(-3, 2, -3); sc.add(rim);
+  const camP = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
+  const shot = (key, face) => {
+    const g = instance(key); if (!g) return null;
+    sc.add(g); g.rotation.y = face ? 0 : 0.45;
+    const box = new THREE.Box3().setFromObject(g), h = box.max.y - box.min.y;
+    if (face) { camP.position.set(0, h * 0.86, h * 0.62); camP.lookAt(0, h * 0.83, 0); }
+    else { camP.position.set(0, h * 0.55, h * 2.05); camP.lookAt(0, h * 0.48, 0); }
+    r.render(sc, camP); sc.remove(g); return r.domElement.toDataURL('image/png');
+  };
+  for (const [fid, f] of Object.entries(cfg.familiars)) portraits[fid] = shot(f.model, false);
+  portraits.mage = shot('mage', true);
+  r.dispose();
+}
+/** Round portrait with the ability glyph as a small badge, so identity is the creature and the ability stays readable. */
+const famFace = (fid, unknown = false) => { const f = cfg.familiars[fid];
+  return `<div class="famIco pic${unknown ? ' unknown' : ''}" style="--c:${css(f.type)}"><img src="${portraits[fid] || ''}" alt="">${unknown ? '' : `<i class="abBadge">${icon(`i_${f.abilityId}`, css(f.type))}</i>`}</div>`; };
+const portraitImg = (fid, cls = '') => `<img class="pt ${cls}" src="${portraits[fid] || ''}" alt="">`;
 
 // ---------- arena ----------
 function groundTexture() {
@@ -363,7 +391,7 @@ const touch = { ab: [null, null, null], release: [false, false, false], releaseA
 addEventListener('keydown', (e) => {
   if (location.hash === '#debug' && e.code === 'KeyZ') { dbg.close = !dbg.close; resize(); }
   if (location.hash === '#debug' && e.code === 'KeyP') dbg.freeze = !dbg.freeze;
-  keys.add(e.code); if (e.code === 'Escape' && sim && running && $('menu').hidden) toggleMenu(true, 'play'); if (['Space', 'KeyQ', 'KeyE', 'KeyR'].includes(e.code)) e.preventDefault(); });
+  keys.add(e.code); if (e.code === 'Escape' && sim && running && $('menu').hidden) toggleMenu(true, 'battle'); if (['Space', 'KeyQ', 'KeyE', 'KeyR'].includes(e.code)) e.preventDefault(); });
 addEventListener('keyup', (e) => keys.delete(e.code));
 addEventListener('blur', () => { keys.clear(); mouse.down = false; });
 const canvas = $('c');
@@ -382,7 +410,7 @@ const sticks = { L: { el: $('stickL'), id: null, ox: 0, oy: 0, v: null }, R: { e
 function stickFor(x) { const leftHalf = x < innerWidth / 2; return (leftHalf !== settings.lefty) ? sticks.L : sticks.R; }
 // Camp: drag turns the wizard's platform or orbits the Sanctuary; a tap selects; pinch or wheel zooms the Sanctuary.
 const campPtr = new Map(); let campMoved = 0, pinchD = 0;
-const campOpen = () => !$('menu').hidden;
+const campOpen = () => !$('menu').hidden && STAGE_PAGES.has(campTab);
 canvas.addEventListener('pointerdown', (e) => {
   if (!campOpen()) return;
   campPtr.set(e.pointerId, { x: e.clientX, y: e.clientY }); campMoved = 0; canvas.setPointerCapture(e.pointerId);
@@ -638,11 +666,15 @@ const rewardHtml = (r) => `${r.xp ? `<span class="reward">${r.xp} XP</span>` : '
 const mkBtn = (text, fn, cls = 'btn sm') => { const b = document.createElement('button'); b.className = cls; b.textContent = text; b.onclick = fn; return b; };
 function saveProf() { store.set('tc.profile', prof); renderWallet(); }
 function saveHome() { store.set('tc.home', home); }
+function renderPurse(id) { $(id).innerHTML = ['gold', 'essence'].map((k) => `<span class="coin" title="${matName(k)}">${sprite(MAT_ICON[k])}${haveOf(k)}</span>`).join(''); }
+function renderAvatar() {
+  const L = P.levelInfo(cfg, prof.xp);
+  $('lvT').textContent = L.level; $('xpRing').style.setProperty('--xp', `${L.need ? Math.round((100 * L.into) / L.need) : 100}%`);
+  if (portraits.mage) $('avatarImg').src = portraits.mage;
+}
 function renderWallet() {
   const L = P.levelInfo(cfg, prof.xp);
-  $('lvT').textContent = L.level;
-  $('xpI').style.width = `${L.need ? Math.round((100 * L.into) / L.need) : 100}%`;
-  $('xpT').textContent = L.need ? `${L.into} / ${L.need} XP` : 'Highest level';
+  renderAvatar();
   $('wallet').innerHTML = ['gold', 'essence'].map((k) => `<span class="coin" title="${matName(k)}">${sprite(MAT_ICON[k])}${haveOf(k)}</span>`).join('');
 }
 function masteryBar(fid) {
@@ -653,35 +685,106 @@ function masteryBar(fid) {
 const gearView = () => S.combatLoadout(cfg, home);
 const weaponModel = () => cfg.weapons[gearView().weaponId].model;
 
-// ----- layout: which 3D stage is behind the sheet -----
-let campTab = 'play';
-const layout = { sheet: 0.56, panel: 440 };
+// ----- navigation: the map is home; the Tome opens pages; every page closes back to the map -----
+let campTab = 'battle';
+const PAGES = { battle: 'Battle', familiars: 'Familiars', wizard: 'Wizard', home: 'Sanctuary', journal: 'Journal' };
+const STAGE_PAGES = new Set(['familiars', 'wizard', 'home']);
 function sheetFraction() {
-  const el = $('sheet'); if ($('menu').hidden) return 0;
-  return innerWidth < innerHeight || innerWidth < 900 ? (el.getBoundingClientRect().height + 68) / innerHeight : 0;
+  const el = $('sheet'); if ($('menu').hidden || !STAGE_PAGES.has(campTab)) return 0;
+  return innerWidth < innerHeight || innerWidth < 900 ? (el.getBoundingClientRect().height + 96) / innerHeight : 0;
+}
+/** What is on screen underneath the pages: the battle if one is running, otherwise the map. */
+function updateBase() {
+  const pageOpen = !$('menu').hidden, battle = sim && running;
+  document.body.classList.toggle('mapHome', !battle && !(pageOpen && STAGE_PAGES.has(campTab)));
+  $('hud').hidden = pageOpen || !battle;
+  if (!battle && !pageOpen && $('bind').hidden && $('reveal').hidden && $('defeat').hidden) openWorld(); else if (battle) hideWorld();
 }
 function toggleMenu(open, tab) {
-  $('menu').hidden = !open; paused = open;
-  $('hud').hidden = open || !(sim && running);
+  $('menu').hidden = !open; $('tomeMenu').hidden = true; paused = open || paused && !running;
   if (open) { showTab(tab || campTab); renderWallet(); }
-  else $('homeLabels').hidden = true;
+  else { $('homeLabels').hidden = true; paused = false; }
+  updateBase();
 }
 function showTab(tab) {
   campTab = tab;
-  for (const b of document.querySelectorAll('.tab')) { b.classList.toggle('on', b.dataset.tab === tab); b.setAttribute('aria-selected', b.dataset.tab === tab); }
+  $('pageTitle').textContent = PAGES[tab];
   for (const p of document.querySelectorAll('.pane')) p.hidden = p.id !== `pane-${tab}`;
-  if (tab === 'explore') document.querySelector('.tab[data-tab=explore]').classList.remove('alert');
-  $('sheet').classList.toggle('low', tab === 'home' || tab === 'wizard');
+  $('menu').classList.toggle('full', !STAGE_PAGES.has(tab));
+  $('sheet').classList.toggle('low', tab === 'home' || tab === 'familiars' || tab === 'wizard');
   $('homeLabels').hidden = tab !== 'home';
   if (tab !== 'home') { placing = null; selDecor = null; Stage.setGhost(cfg, null); }
-  ({ play: renderPlay, explore: renderExplore, wizard: renderWizard, home: renderHome, journal: renderJournal })[tab]();
+  ({ battle: renderPlay, familiars: renderTeam, wizard: renderWizard, home: renderHome, journal: renderJournal })[tab]();
+  if (tab === 'familiars') Stage.setHubLoadout(loadout, weaponModel());
   $('sheet').scrollTop = 0;
+  updateBase();
 }
-for (const b of document.querySelectorAll('.tab')) b.onclick = () => showTab(b.dataset.tab);
-$('menuBtn').onclick = () => toggleMenu(true, 'play');
-$('whoBtn').onclick = () => showTab('wizard');
-$('setBtn').onclick = () => { $('settingsOv').hidden = false; };
+$('pageClose').onclick = () => toggleMenu(false);
+$('menuBtn').onclick = () => toggleMenu(true, 'battle');
 $('setClose').onclick = () => { $('settingsOv').hidden = true; };
+$('tomeBtn').onclick = () => { $('tomeMenu').hidden = false; $('nearbyPanel').hidden = true; renderPurse('tmPurse'); };
+$('tomeClose').onclick = () => { $('tomeMenu').hidden = true; };
+for (const t of document.querySelectorAll('#tomeMenu .tile')) t.onclick = () => {
+  if (t.dataset.go === 'settings') { $('settingsOv').hidden = false; return; }
+  toggleMenu(true, t.dataset.go);
+};
+$('avatarBtn').onclick = () => toggleMenu(true, 'wizard');
+$('nearbyBtn').onclick = () => { $('nearbyPanel').hidden = !$('nearbyPanel').hidden; if (!$('nearbyPanel').hidden) renderNearby(); };
+$('nearbyClose').onclick = () => { $('nearbyPanel').hidden = true; };
+
+// ----- Nearby: map familiars, rift portals and wild sightings, nearest first -----
+const unknownSpecies = (fid) => !col.owned[fid] && !col.seen[fid];
+const faceImg = (fid) => `<img src="${portraits[fid] || ''}" alt=""${unknownSpecies(fid) ? ' class="unknown"' : ''}>`;
+function renderNearbyButton() {
+  const { spawns } = nearbyState(), wild = col.encounters.filter((e) => e.state === 'open');
+  const faces = [...spawns.map((s) => s.familiarId), ...wild.map((e) => e.familiarId)].slice(0, 3);
+  $('nearFaces').innerHTML = faces.map(faceImg).join('');
+  const n = spawns.length + wild.length;
+  $('nearCount').textContent = n ? `${n} nearby` : 'Nearby';
+}
+function renderNearby() {
+  renderNearbyButton();
+  if ($('nearbyPanel').hidden) return;
+  const { spawns, sites, pos, acc } = nearbyState(), list = $('nearList'); list.innerHTML = '';
+  const row = (html, rc, onClick) => { const b = document.createElement('button'); b.className = 'nearRow'; b.style.setProperty('--rc', rc); b.innerHTML = html; b.onclick = onClick; list.appendChild(b); };
+  const head = (t) => list.insertAdjacentHTML('beforeend', `<h2 style="margin:10px 0 6px;font-size:18px">${t}</h2>`);
+  if (spawns.length) head('On the map');
+  for (const s of spawns) {
+    const f = cfg.familiars[s.familiarId], r = rarityCfg(s.rarity), near = World.inRange(cfg, pos, s, acc);
+    row(`${faceImg(s.familiarId)}<span class="grow"><b>${unknownSpecies(s.familiarId) ? 'Unknown familiar' : f.name}</b><span class="s">${r.label} · ${Math.round(s.distance)} m</span></span>${near ? '<span class="tag" style="--c:var(--brass)">In reach</span>' : ''}`,
+      r.color, () => { flyTo(s); $('nearbyPanel').hidden = true; });
+  }
+  if (sites.length) head('Rift portals');
+  for (const s of sites.slice(0, 3)) {
+    const rf = cfg.rifts.find((x) => x.id === s.riftId);
+    row(`<img src="${spriteUrl('n_play')}" alt="" style="background:#2a1210;padding:8px"><span class="grow"><b>${rf.name}</b><span class="s">${Math.round(s.distance)} m · portal bonus</span></span>`, '#c8463a', () => { flyTo(s); $('nearbyPanel').hidden = true; });
+  }
+  const wild = col.encounters.filter((e) => e.state === 'open');
+  head('Sightings <span class="comp">bind from anywhere</span>');
+  if (!wild.length) list.insertAdjacentHTML('beforeend', `<p class="s">Sightings turn up every few minutes and when you clear battle waves.</p>`);
+  for (const e of wild) {
+    const f = cfg.familiars[e.familiarId], r = rarityCfg(e.rarity), left = Math.max(e.expiresAt, e.engagedUntil) - Date.now();
+    row(`${faceImg(e.familiarId)}<span class="grow"><b>${f.name}</b><span class="s">${r.label} · leaves in ${fmtTime(left)} · ${e.attemptsLeft} ${e.attemptsLeft === 1 ? 'try' : 'tries'}</span></span><span class="tag" style="--c:var(--ember2)">Bind</span>`,
+      r.color, () => { $('nearbyPanel').hidden = true; openBinding(e.id, 'map'); });
+  }
+}
+function renderExplore() { renderNearby(); }
+
+// ----- rift portals on the map -----
+let pendingRift = null;
+function openRift(rift, distance) {
+  pendingRift = { rift, portal: distance === null };
+  const c = rift.clearReward, lvl = P.levelInfo(cfg, prof.xp).level, locked = lvl < rift.minLevel;
+  $('riftBody').innerHTML = `<h1 style="font-size:32px">${rift.name}</h1><p>${rift.desc}</p>
+    <div class="tags">${rift.modifiers.map((m) => `<span class="tag" style="--c:var(--brass)">${cfg.riftModifiers[m].name}: ${cfg.riftModifiers[m].desc.toLowerCase()}</span>`).join('')}</div>
+    <p class="s" style="margin-top:10px">${distance === null ? 'You are at the portal: the clear bonus is 50% bigger.' : `The portal is ${distance} m away. Walk to it for a 50% bigger clear bonus, or enter now from here.`}</p>
+    <div class="cost">${rewardHtml(distance === null ? scaleReward(c, cfg.world.portalBonus) : c)}</div>${locked ? `<p class="lock">Reach wizard level ${rift.minLevel} to enter</p>` : ''}`;
+  $('riftGo').disabled = locked || loadout.length !== 3;
+  $('riftOv').hidden = false;
+}
+const scaleReward = (c, k) => ({ ...c, xp: Math.round(c.xp * k), gold: Math.round(c.gold * k), essence: Math.round(c.essence * k), materials: Object.fromEntries(Object.entries(c.materials || {}).map(([m, v]) => [m, Math.round(v * k)])) });
+$('riftClose').onclick = () => { $('riftOv').hidden = true; };
+$('riftGo').onclick = () => { $('riftOv').hidden = true; startBattle(pendingRift.rift, pendingRift.portal); toggleMenu(false); };
 
 // ----- Play -----
 function renderPlay() {
@@ -715,18 +818,18 @@ function renderRifts() {
 $('startBtn').onclick = () => { startBattle(); toggleMenu(false); };
 
 // ----- Wizard: team, gear, bag -----
-let seg = 'team', gearSlot = 'weapon';
+let seg = 'gear', gearSlot = 'weapon';
 for (const b of document.querySelectorAll('.seg button')) b.onclick = () => { seg = b.dataset.seg; renderWizard(); };
 function renderWizard() {
   for (const b of document.querySelectorAll('.seg button')) b.classList.toggle('on', b.dataset.seg === seg);
-  for (const s of ['team', 'gear', 'bag']) $(`seg-${s}`).hidden = s !== seg;
-  ({ team: renderTeam, gear: renderGear, bag: renderBag })[seg]();
+  for (const s of ['gear', 'bag']) $(`seg-${s}`).hidden = s !== seg;
+  ({ gear: renderGear, bag: renderBag })[seg]();
   Stage.setHubLoadout(loadout, weaponModel());
 }
 function renderTeam() {
   $('teamSlots').innerHTML = [0, 1, 2].map((i) => {
     const fid = loadout[i], f = fid && cfg.familiars[fid];
-    return f ? `<button class="slotR" data-i="${i}" style="--c:${css(f.type)}" aria-label="Remove ${f.name}">${icon(`i_${f.abilityId}`, css(f.type))}<small>${f.name}</small></button>`
+    return f ? `<button class="slotR" data-i="${i}" style="--c:${css(f.type)}" aria-label="Remove ${f.name}">${portraitImg(fid)}<i class="abBadge">${icon(`i_${f.abilityId}`, css(f.type))}</i><small>${f.name}</small></button>`
       : `<button class="slotR empty" data-i="${i}" aria-label="Empty slot">${icon('i_arcane', '#666')}<small>Empty</small></button>`;
   }).join('');
   for (const b of $('teamSlots').children) b.onclick = () => { const fid = loadout[+b.dataset.i]; if (fid) { loadout.splice(+b.dataset.i, 1); teamChanged(); } };
@@ -739,7 +842,7 @@ function renderTeam() {
     const i = loadout.indexOf(fid), ab = P.effectiveAbility(cfg, col, prof, fid), mi = P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0);
     const b = document.createElement('button'); b.className = `pick${i >= 0 ? ' sel' : ''}`; b.style.setProperty('--c', css(f.type));
     b.setAttribute('aria-pressed', i >= 0);
-    b.innerHTML = `<div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div><b>${f.name}</b><span>${ab.name} · Mastery ${mi.level}</span></div>${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}`;
+    b.innerHTML = `${famFace(fid)}<div><b>${f.name}</b><span>${ab.name} · Mastery ${mi.level}</span></div>${i >= 0 ? `<span class="n">${i + 1}</span>` : ''}`;
     b.onclick = () => { if (i >= 0) loadout.splice(i, 1); else if (loadout.length < 3) loadout.push(fid); else { loadout[2] = fid; } teamChanged(); };
     grid.appendChild(b);
   }
@@ -778,7 +881,7 @@ function renderGear() {
     d.innerHTML = `<div class="grow"><b>${S.itemName(cfg, it)}</b> <span class="s">level ${it.level}</span>
       <div class="s">${w ? cfg.weapons[w].desc + ' ' : ''}${Object.entries(st).filter(([, v]) => v).map(([k, v]) => `<span class="${S.isUpside(cfg, k, v) ? 'lvl' : 'lock'}" style="font-weight:600;color:${S.isUpside(cfg, k, v) ? '#9fd68a' : 'var(--ember2)'}">${G.stats[k]} ${v > 0 ? '+' : ''}${v}%</span>`).join(', ')}</div></div>`;
     d.appendChild(on ? (gearSlot === 'weapon' ? Object.assign(document.createElement('span'), { className: 's', textContent: 'Equipped' }) : mkBtn('Remove', () => { S.unequip(cfg, home, gearSlot); saveHome(); renderGear(); }))
-      : mkBtn('Equip', () => { S.equip(cfg, home, it.uid); saveHome(); renderGear(); Stage.setHubLoadout(loadout, weaponModel()); }, 'btn sm go'));
+      : mkBtn('Equip', () => { S.equip(cfg, home, it.uid); saveHome(); renderGear(); Stage.setHubLoadout(loadout, weaponModel()); refreshWizardGear(); }, 'btn sm go'));
     rows.appendChild(d);
   }
   list.appendChild(rows);
@@ -830,7 +933,7 @@ function facChamber(el) {
   for (const fid of Object.keys(col.owned)) {
     const f = cfg.familiars[fid], c = P.ascensionCost(cfg, col, fid), ready = c && !c.maxed && !c.short;
     const d = document.createElement('div'); d.className = `row2${ready ? ' focus' : ''}`;
-    d.innerHTML = `<div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow"><b>${f.name}</b> <span class="s">${cfg.ascension.ranks[c.rank]}${ready ? ' · <span class="lvl">ready to Ascend</span>' : ''}</span>${masteryBar(fid)}</div>`;
+    d.innerHTML = `${famFace(fid)}<div class="grow"><b>${f.name}</b> <span class="s">${cfg.ascension.ranks[c.rank]}${ready ? ' · <span class="lvl">ready to Ascend</span>' : ''}</span>${masteryBar(fid)}</div>`;
     d.appendChild(mkBtn('Manage', () => openDetail(fid))); $('chRows').appendChild(d);
   }
 }
@@ -924,9 +1027,9 @@ function renderJournal() {
   $('colT').textContent = `${owned.length} of ${ids.length} bound`;
   $('journal').innerHTML = ids.map((fid) => {
     const f = cfg.familiars[fid], o = col.owned[fid], seen = col.seen[fid], r = rarityCfg(f.rarity), ab = cfg.abilities[f.abilityId];
-    if (!o && !seen) return `<div class="jc unknown"><div class="famIco" style="--c:#555">${icon('i_arcane', '#555')}</div><div><div class="t">Undiscovered</div><div class="s">Keep exploring.</div></div></div>`;
+    if (!o && !seen) return `<div class="jc unknown">${famFace(fid, true)}<div><div class="t">Undiscovered</div><div class="s">Keep exploring.</div></div></div>`;
     const c = o && P.ascensionCost(cfg, col, fid);
-    return `<div class="jc"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow" style="flex:1">
+    return `<div class="jc">${famFace(fid)}<div class="grow" style="flex:1">
       <div class="t">${f.name}</div>
       <div style="display:flex;gap:5px;flex-wrap:wrap;margin:4px 0"><span class="badge" style="--c:${css(f.type)}">${icon(`i_${f.type}`, css(f.type))}${f.type[0].toUpperCase() + f.type.slice(1)}</span><span class="badge" style="--c:${r.color}">${'◆'.repeat(r.pips)} ${r.label}</span></div>
       <div class="s">${o ? `${ab.name} · bound ${o.captures}× · ${o.credits} ${o.credits === 1 ? 'credit' : 'credits'} · ${cfg.ascension.ranks[c.rank]}` : 'Seen in the wilds. Not bound yet.'}</div>
@@ -963,7 +1066,7 @@ function showResults(r, outcome) {
     const m = r.g.mastery?.[fid], f = cfg.familiars[fid];
     const note = m ? `+${m.gained} Mastery${m.to > m.from ? ` · <span class="lvl">Mastery ${m.to}${m.from < M.branchAt && m.to >= M.branchAt ? ', modifiers unlocked' : ''}</span>` : ''}`
       : r.rw.xp ? 'No Mastery: it didn\'t hit or block anything this run.' : '';
-    h += `<div class="res"><div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div><div class="grow"><b style="font:700 17px var(--display)">${f.name}</b><div class="s">${note}</div>${masteryBar(fid)}</div></div>`;
+    h += `<div class="res">${famFace(fid)}<div class="grow"><b style="font:700 17px var(--display)">${f.name}</b><div class="s">${note}</div>${masteryBar(fid)}</div></div>`;
   }
   h += `<p class="s" style="margin-top:12px"><b style="color:var(--bone)">Next:</b> ${nextGoal(r.fids)}</p>`;
   $('resBody').innerHTML = h; $('defeat').hidden = false; paused = true;
@@ -979,8 +1082,9 @@ function nextGoal(fids) {
   const best = fids.map((fid) => ({ fid, mi: P.masteryInfo(cfg, prof.familiars[fid]?.masteryXp || 0) })).filter((x) => x.mi.nextAt !== null).sort((a, b) => (a.mi.nextAt - a.mi.xp) - (b.mi.nextAt - b.mi.xp))[0];
   return best ? `${Math.ceil(best.mi.nextAt - best.mi.xp)} more Mastery for ${cfg.familiars[best.fid].name} to reach Mastery ${best.mi.level + 1}.` : 'Bind more familiars from the Map.';
 }
-$('retryBtn').onclick = () => { $('defeat').hidden = true; startBattle(activeRift); paused = false; $('hud').hidden = false; };
-$('loadoutBtn').onclick = () => { $('defeat').hidden = true; toggleMenu(true, 'play'); };
+$('retryBtn').onclick = () => { $('defeat').hidden = true; startBattle(activeRift?.portal ? cfg.rifts.find((r) => r.id === activeRift.id) : activeRift, !!activeRift?.portal); paused = false; updateBase(); };
+$('loadoutBtn').textContent = 'Back to the map';
+$('loadoutBtn').onclick = () => { $('defeat').hidden = true; sim = null; clearVisuals(); updateBase(); };
 
 // ---------- familiar detail: Mastery, Ascension, modifier ----------
 let detFid = null;
@@ -1021,11 +1125,11 @@ function clearVisuals() {
   for (const f of vis.fx) { if (f.mesh) fxGroup.remove(f.mesh); if (f.el) f.el.remove(); }
   vis.enemies.clear(); vis.projectiles.clear(); vis.zones.clear(); vis.fx.length = 0; lastPos.clear();
 }
-function startBattle(rift = null) {
+function startBattle(rift = null, portal = false) {
   store.set('ww.loadout', loadout);
   const prev = settleRun(); // starting again mid-run still pays out the run so far
   if (prev && prev.rw.xp) toast(`Previous run: +${prev.rw.xp} XP, +${prev.rw.gold} Gold`);
-  activeLoadout = [...loadout]; activeRift = rift;
+  activeLoadout = [...loadout]; activeRift = rift && portal ? { ...rift, clearReward: scaleReward(rift.clearReward, cfg.world.portalBonus), portal: true } : rift;
   clearVisuals();
   const seed = (Math.random() * 1e9) | 0, G = gearView();
   const abilities = activeLoadout.map((fid) => { const ab = P.effectiveAbility(cfg, col, prof, fid); return { ...ab, cooldown: ab.cooldown * G.cooldownMult }; });
@@ -1051,8 +1155,8 @@ function toast(text, color, onClick) {
 function announce(e) {
   const f = cfg.familiars[e.familiarId], r = rarityCfg(e.rarity);
   document.querySelector('.tab[data-tab=explore]').classList.add('alert');
-  if (!$('bind').hidden || !$('reveal').hidden || worldOpen()) return; // don't interrupt a binding or the map
-  toast(`A wild ${f.name} (${r.label}, ${f.type}) appeared nearby. Tap to find it.`, r.color, () => toggleMenu(true, 'explore'));
+  if (!$('bind').hidden || !$('reveal').hidden || (sim && running)) return; // don't interrupt a binding or a battle
+  toast(`A wild ${f.name} (${r.label}) was sighted. Tap to see it in Nearby.`, r.color, () => { toggleMenu(false); $('nearbyPanel').hidden = false; renderNearby(); });
   if (e.rarity !== 'common' && e.rarity !== 'uncommon') chime(r);
 }
 function tickWilds() {
@@ -1062,32 +1166,12 @@ function tickWilds() {
     const e = Col.spawnEncounter(cfg, col, clientRng, now, 'wilds');
     if (e) { saveCol(); announce(e); } else col.lastSpawnAt = now;
   }
-  if (!$('menu').hidden && !$('pane-explore').hidden) renderExplore();
+  renderNearby();
 }
 function waveDiscovery() {
   if (Math.random() > cfg.explore.waveDiscoveryChance) return;
   const e = Col.spawnEncounter(cfg, col, clientRng, Date.now(), 'battle');
   if (e) { saveCol(); announce(e); }
-}
-function renderExplore() {
-  if (!col) return;
-  const now = Date.now(), list = $('encList');
-  const open = col.encounters.filter((e) => e.state === 'open');
-  const next = cfg.explore.spawnEverySec * 1000 - (now - col.lastSpawnAt);
-  $('nextT').textContent = open.length >= cfg.explore.maxActive ? '· the wilds are full' : `· next sighting in about ${fmtTime(next)}`;
-  if (!open.length) { list.innerHTML = '<div class="empty">Nothing nearby yet. Familiars appear every so often, and clearing battle waves can draw them out.</div>'; return; }
-  list.innerHTML = '';
-  for (const e of open) {
-    const f = cfg.familiars[e.familiarId], r = rarityCfg(e.rarity), owned = col.owned[e.familiarId];
-    const d = document.createElement('div'); d.className = 'enc'; d.style.setProperty('--rc', r.color);
-    const left = Math.max(e.expiresAt, e.engagedUntil) - now;
-    d.innerHTML = `<div class="famIco" style="--c:${css(f.type)}">${icon(`i_${f.abilityId}`, css(f.type))}</div>
-      <div class="grow"><div class="rb">${'◆'.repeat(r.pips)} ${r.label.toUpperCase()}</div><div class="nm">${f.name}</div>
-      <div class="row" style="display:flex;gap:6px;margin-top:4px"><span class="badge" style="--c:${css(f.type)}">${icon(`i_${f.type}`, css(f.type))}${f.type.toUpperCase()}</span></div>
-      <div class="meta">${owned ? `Owned · binding again gives a duplicate credit` : 'New familiar · binding unlocks its ability'} · ${e.attemptsLeft} ${e.attemptsLeft === 1 ? 'try' : 'tries'} left · leaves in ${fmtTime(left)}${e.source === 'battle' ? ' · drawn out by battle' : ''}</div></div>`;
-    const b = document.createElement('button'); b.className = 'btn sm go'; b.textContent = 'Bind'; b.onclick = () => openBinding(e.id);
-    d.appendChild(b); list.appendChild(d);
-  }
 }
 function renderLegend() {
   $('legend').innerHTML = cfg.rarities.map((r) => {
@@ -1107,14 +1191,28 @@ function showPreview(container, familiarId, color, mood = 'idle') {
     const d = new THREE.DirectionalLight(0xffffff, 1.8); d.position.set(2, 4, 3); preview.scene.add(d);
     preview.cam = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
   }
-  const canvasEl = preview.renderer.domElement; container.appendChild(canvasEl);
-  const size = Math.max(10, Math.round(container.clientWidth * 0.64));
-  preview.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); preview.renderer.setSize(size, size, false);
+  const canvasEl = preview.renderer.domElement; container.prepend(canvasEl);
+  // Encounters fill the screen: the creature stands on a patch of ground under a dusk sky. Reveals stay in their frame.
+  const full = mood === 'menace';
+  if (!preview.ground) {
+    const sky = document.createElement('canvas'); sky.width = 4; sky.height = 256; const sx = sky.getContext('2d');
+    const gr = sx.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#0e1517'); gr.addColorStop(0.55, '#2a3a3a'); gr.addColorStop(1, '#3d4a3a'); sx.fillStyle = gr; sx.fillRect(0, 0, 4, 256);
+    preview.sky = new THREE.CanvasTexture(sky); preview.sky.colorSpace = THREE.SRGBColorSpace;
+    preview.ground = new THREE.Group();
+    const disc = new THREE.Mesh(new THREE.CircleGeometry(30, 48), new THREE.MeshLambertMaterial({ color: 0x3b5236 })); disc.rotation.x = -Math.PI / 2; preview.ground.add(disc);
+    const shade = new THREE.Mesh(new THREE.CircleGeometry(1, 32), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false })); shade.rotation.x = -Math.PI / 2; shade.position.y = 0.01; preview.ground.add(shade); preview.shade = shade;
+    for (let i = 0; i < 40; i++) { const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.05 + Math.random() * 0.05, 0.25 + Math.random() * 0.2, 4), new THREE.MeshLambertMaterial({ color: 0x4f6b40 })); const a = Math.random() * Math.PI * 2, d = 1.2 + Math.random() * 6; tuft.position.set(Math.cos(a) * d, 0.1, Math.sin(a) * d - 1); preview.ground.add(tuft); }
+    preview.scene.add(preview.ground);
+  }
+  preview.ground.visible = full; preview.scene.background = full ? preview.sky : null; preview.scene.fog = full ? new THREE.Fog(0x2a3a3a, 8, 26) : null;
+  const w = full ? innerWidth : Math.max(10, Math.round(container.clientWidth * 0.64)), hh = full ? innerHeight : w;
+  preview.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); preview.renderer.setSize(w, hh, false); preview.cam.aspect = w / hh; preview.cam.updateProjectionMatrix();
   if (preview.model) preview.scene.remove(preview.model);
   const f = cfg.familiars[familiarId];
   const g = instance(f.model) || new THREE.Mesh(new THREE.IcosahedronGeometry(0.6), new THREE.MeshLambertMaterial({ color }));
   const box = new THREE.Box3().setFromObject(g), h = Math.max(0.5, box.max.y - box.min.y);
-  preview.cam.position.set(0, h * 0.6, h * 2.05); preview.cam.lookAt(0, h * 0.5, 0);
+  if (full) { const d = h * 2.6 / Math.min(1, preview.cam.aspect * 1.4); preview.cam.position.set(0, h * 0.45, d); preview.cam.lookAt(0, h * 0.62, 0); preview.shade.scale.setScalar(Math.max(0.6, h * 0.35)); }
+  else { preview.cam.position.set(0, h * 0.6, h * 2.05); preview.cam.lookAt(0, h * 0.5, 0); }
   g.userData.s0 = 1; g.userData.baseY = 0;
   preview.model = g; preview.modelKey = f.model; preview.t = 0; preview.anim = g.userData && g.userData.anim; preview.scene.add(g);
   // Rigged creatures hold a stance: a wary crouch while you bind them, an easy idle once they're yours.
@@ -1158,8 +1256,8 @@ function openBinding(encId, from = 'explore') {
   $('bindName').textContent = f.name;
   $('bindType').innerHTML = `${icon(`i_${f.type}`, css(f.type))} ${f.type.toUpperCase()} · ${cfg.abilities[f.abilityId].name} · ${r.stages === 2 ? 'two-stage binding' : 'one-stage binding'}`;
   $('bindMsg').textContent = `Tap (or press Space) when the light is inside the glowing arc. ${cfg.capture.hitsPerStage} hits per stage, ${cfg.capture.timeLimitSec} seconds. Better timing raises your chance. ${e.attemptsLeft} ${e.attemptsLeft === 1 ? 'try' : 'tries'} left.`;
-  $('bindGo').hidden = false; $('bindGo').textContent = 'Begin binding'; $('bindLeave').textContent = 'Leave';
-  $('menu').hidden = true; $('bind').hidden = false; paused = true;
+  $('bindGo').hidden = false; $('bindGo').textContent = 'Begin binding';
+  $('menu').hidden = true; $('tomeMenu').hidden = true; $('nearbyPanel').hidden = true; $('bind').hidden = false; paused = true;
   showPreview($('bindStage'), e.familiarId, TYPE_HEX[f.type], 'menace');
   drawRing();
 }
@@ -1203,7 +1301,7 @@ function finishBinding() {
     $('bindGo').hidden = false; $('bindGo').textContent = 'Try again';
   } else {
     $('bindMsg').textContent = res.outcome === 'fled' ? `It fled (your chance was ${pct}%). It may appear again.` : 'That familiar is no longer here.';
-    $('bindLeave').textContent = 'Back';
+    $('bindGo').hidden = true;
   }
   drawRing();
 }
@@ -1243,7 +1341,7 @@ function updateBinding(dt) {
 }
 $('bindStage').addEventListener('pointerdown', (e) => { e.preventDefault(); bindTap(); });
 $('bindGo').onclick = () => startStage(1);
-$('bindLeave').onclick = () => { bind.active = false; $('bind').hidden = true; if (bindFrom === 'map') returnToWorld(); else toggleMenu(true, 'explore'); };
+$('bindLeave').onclick = () => { bind.active = false; $('bind').hidden = true; updateBase(); };
 addEventListener('keydown', (e) => { if (!$('bind').hidden && (e.code === 'Space' || e.code === 'Enter')) { e.preventDefault(); bindTap(); } });
 
 function showReveal(res, rw) {
@@ -1270,7 +1368,7 @@ function showReveal(res, rw) {
     }
   }
 }
-$('revOk').onclick = () => { $('reveal').hidden = true; if (bindFrom === 'map') returnToWorld(); else toggleMenu(true, 'journal'); };
+$('revOk').onclick = () => { $('reveal').hidden = true; updateBase(); renderNearby(); renderAvatar(); };
 
 // ---------- loop ----------
 const clock = new THREE.Clock(); let acc = 0; const DT = 1 / 60;
@@ -1298,10 +1396,10 @@ function frame() {
     const f = vis.fx[i]; f.t += dt; const k = Math.min(1, f.t / f.life); f.update(f, k);
     if (k >= 1) { if (f.mesh) { fxGroup.remove(f.mesh); scene.remove(f.mesh); } if (f.el) f.el.remove(); vis.fx.splice(i, 1); }
   }
-  if (campOpen() && $('world').hidden) {
+  if (campOpen()) {
     const lay = { sheet: sheetFraction(), panel: innerWidth >= 900 && innerWidth > innerHeight ? 440 : 0 };
     if (campTab === 'home') { Stage.renderHome(renderer, dt, lay); updateHomeLabels(); } else Stage.renderHub(renderer, dt, t, lay);
-  } else renderer.render(scene, cam);
+  } else if (sim) renderer.render(scene, cam);
   updateBinding(dt); updatePreview(dt); tickWorld(dt);
 }
 
@@ -1325,7 +1423,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=13')).json();
+    cfg = await (await fetch('data/config.json?v=14')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
@@ -1340,11 +1438,11 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
     renderLegend();
     setInterval(tickWilds, 1000);
     initWorld({ cfg, col: () => col, saveCol, rarityCfg, icon, css, toast, openBinding,
-      pause: (p) => { paused = p; }, openMenu: (tab) => toggleMenu(true, tab) });
-    $('openMap').onclick = () => { $('menu').hidden = true; openWorld(); };
+      store, instance, attachStaff: Stage.attachStaff, staffModel: () => weaponModel(), creatureIdle: Stage.creatureIdle, openRift, onNearby: renderNearby });
     await Stage.setHubLoadout(loadout, weaponModel());
     $('loading').remove();
-    toggleMenu(true, 'play');
+    makePortraits(); renderAvatar(); renderNearbyButton();
+    toggleMenu(false);
     camTarget.set(0, 0, 4); cam.position.copy(camTarget).add(CAM_OFF); cam.lookAt(camTarget);
     frame();
   } catch (err) {

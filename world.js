@@ -1,7 +1,7 @@
 // Tomecraft GPS overworld rules (M6 alpha): map cells, deterministic spawns, range and speed checks.
 // Pure logic. Spawns come from a hash of (cell, time window), so everyone in the same place sees the same
 // familiars without a server, and nothing about the player's location leaves the device.
-import { rollSpecies, rngFrom } from './collection.js?v=13';
+import { rollSpecies, rngFrom } from './collection.js?v=14';
 
 const R_EARTH = 6371000;
 export function distanceM(a, b) {
@@ -77,3 +77,22 @@ export function toEncounter(cfg, spawn, now) {
   return { id: spawn.id, familiarId: spawn.familiarId, rarity: spawn.rarity, type: spawn.type, source: 'map', createdAt: now,
     expiresAt: spawn.expiresAt, attemptsLeft: cfg.capture.attempts, state: 'open', engagedUntil: 0 };
 }
+
+/** Rift portals (M5 map): one fixed site per rift cell, the same for everyone, chosen from rifts the config marks as map-placed. */
+export function riftSites(cfg, pos, radiusM) {
+  const W = { ...cfg.world, cellM: cfg.world.riftCellM }, c = cellOf(W, pos.lat, pos.lon), pool = cfg.rifts.filter((r) => r.onMap);
+  const reach = Math.ceil(radiusM / W.cellM) + 1, out = [];
+  if (!pool.length) return out;
+  for (let dy = -reach; dy <= reach; dy++) {
+    const cy = c.cy + dy, lonStep = lonStepForRow(W, cy, c.latStep), cx0 = Math.floor(pos.lon / lonStep);
+    for (let dx = -reach; dx <= reach; dx++) {
+      const cx = cx0 + dx, rng = rngFrom(hash(W.seed, 'rift', cx, cy));
+      const rift = pool[Math.floor(rng() * pool.length)];
+      const site = { id: `r:${cx}:${cy}`, riftId: rift.id, lat: (cy + 0.2 + rng() * 0.6) * c.latStep, lon: (cx + 0.2 + rng() * 0.6) * lonStep };
+      site.distance = distanceM(pos, site);
+      if (site.distance <= radiusM) out.push(site);
+    }
+  }
+  return out.sort((a, b) => a.distance - b.distance);
+}
+export const riftInRange = (cfg, pos, site, acc = 0) => distanceM(pos, site) - Math.min(acc, cfg.world.accuracyAllowanceM) <= cfg.world.riftRadiusM;
