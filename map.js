@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=36';
-import * as Col from './collection.js?v=36';
+import * as World from './world.js?v=37';
+import * as Col from './collection.js?v=37';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -308,7 +308,7 @@ const t3 = (t, w) => (g3.clock.elapsedTime + w.userData.wisp) * 1.5;
 const lamps = new Set();
 async function lightLeyLines() {
   let lines = [];
-  try { lines = st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'transportation', filter: ['==', ['get', 'class'], 'path'] }); } catch { return; }
+  try { lines = st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'transportation' }).filter((f) => f.properties.class === 'path'); } catch { return; }
   const src = await floraModel('lamp'); if (!src) return;
   const me = st.pos, mLat = 111320, mLon = 111320 * Math.cos((me.lat * Math.PI) / 180);
   for (const f of lines) {

@@ -421,9 +421,9 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .pageHead h1::before{content:'';position:absolute;z-index:-1;left:0;right:0;top:-40px;height:calc(100% + 64px);background:#5a1c15;-webkit-mask:var(--u-g_flag) top/100% 100% no-repeat;mask:var(--u-g_flag) top/100% 100% no-repeat;filter:drop-shadow(0 4px 8px #000)}
 /* loading: static paths, since the sprite variables are not ready yet */
 #loading{background:radial-gradient(ellipse at 50% 40%,#2a2342,#0b0a14 72%)}
-#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=36') center/contain no-repeat;opacity:.9}
+#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=37') center/contain no-repeat;opacity:.9}
 #loading h1{font-size:56px;text-shadow:0 3px 12px #000,0 0 30px #7b5cd666}
-#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=36') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
+#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=37') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
 #loading .lb i{background:linear-gradient(90deg,#b8862e,#f2cf86)}
 #loadT{font:600 15px var(--body);color:#c9bfa8}
 
@@ -507,6 +507,15 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .riftMods>div{border:7px solid transparent;border-image:var(--u-g_row) 40 / 10px stretch;background:#140d0e padding-box;padding:4px 8px}
 .riftMods b{display:block;font:700 15px var(--display);color:#f0b39a}.riftMods span{font:500 13px var(--body);color:var(--ash)}
 .riftWhere{font:600 13px var(--body);color:var(--ash);margin:8px 0 4px}.riftWhere.here{color:#ffd28a}
+/* symmetric side cards: picture row on top, one label line beneath, a count badge in the corner */
+.sideCard{flex-direction:column;justify-content:center;gap:3px;padding:4px 6px}
+.avatarBtn .avWrap{width:46px;height:46px}.avatarBtn .avWrap img{inset:4px;width:38px;height:38px}
+.avatarBtn .xpRing{-webkit-mask:radial-gradient(circle,transparent 19px,#000 20px);mask:radial-gradient(circle,transparent 19px,#000 20px)}
+.avatarBtn .scLabel,.nearbyBtn .scLabel{align-items:center;text-align:center}
+.avatarBtn .scLabel b,.nearbyBtn .scLabel b{font-size:15px;line-height:1.05}
+.avatarBtn .scLabel small,.nearbyBtn .scLabel small{font-size:11px}
+.nearFaces .slot{width:28px;height:28px}
+@media (max-width:360px){.nearFaces .slot{width:24px;height:24px}.avatarBtn .avWrap{width:40px;height:40px}.avatarBtn .avWrap img{width:32px;height:32px}}
 </style>
 </head>
 <body>
@@ -684,6 +693,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=36"></script>
+<script type="module" src="game.js?v=37"></script>
 </body>
 </html>
