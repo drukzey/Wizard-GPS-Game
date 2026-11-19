@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=24';
-import * as Col from './collection.js?v=24';
+import * as World from './world.js?v=25';
+import * as Col from './collection.js?v=25';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -219,8 +219,8 @@ function addFamiliar3d(s) {
   const f = H.cfg.familiars[s.familiarId], r = H.rarityCfg(s.rarity);
   const g = new THREE.Group(); g.userData = { at: s, model: f.model, phase: Math.random() * 6 };
   const body = H.instance(f.model);
-  if (body) { body.userData.s0 = SCALE * 0.9; body.scale.setScalar(SCALE * 0.9); body.userData.anim?.setLoco({ idle: 0.7, menace: 0.3 }); g.add(body); g.userData.body = body; g.userData.anim = body.userData.anim; }
-  const ring = groundRing(new THREE.Color(r.color), 2.6, 3.4); g.add(ring); g.userData.ring = ring;
+  if (body) { body.userData.s0 = SCALE * 1.3; body.scale.setScalar(SCALE * 1.3); body.userData.anim?.setLoco({ idle: 0.7, menace: 0.3 }); g.add(body); g.userData.body = body; g.userData.anim = body.userData.anim; }
+  const ring = groundRing(new THREE.Color(r.color), 3.6, 4.8); g.add(ring); g.userData.ring = ring;
   g.rotation.y = Math.random() * Math.PI * 2;
   const p = local(s); g.position.set(p.x, 0, p.z); g3.scene.add(g); g3.things.set(s.id, g);
 }
