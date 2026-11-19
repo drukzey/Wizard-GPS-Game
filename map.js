@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=37';
-import * as Col from './collection.js?v=37';
+import * as World from './world.js?v=38';
+import * as Col from './collection.js?v=38';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -229,22 +229,23 @@ function addFamiliar3d(s) {
 // a beam of red light, and rock shards drifting around it. Every rift reads the same way from any distance.
 const VORTEX = { vertex: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
   fragment: `uniform float t; varying vec2 vUv;
-    void main(){ vec2 p = vUv * 2.0 - 1.0; p.x *= 0.62; float r = length(p); if (r > 1.0) discard;
-      float a = atan(p.y, p.x) + t * 0.9 + 3.0 / (r + 0.25);
-      float swirl = 0.5 + 0.5 * sin(a * 5.0 - r * 9.0 + t * 2.0);
-      vec3 core = vec3(0.05, 0.0, 0.08), mid = vec3(0.55, 0.06, 0.32), edge = vec3(1.0, 0.42, 0.24);
-      vec3 c = mix(core, mid, smoothstep(0.05, 0.75, r)); c = mix(c, edge, smoothstep(0.75, 1.0, r) * (0.6 + 0.4 * swirl));
-      c += mid * swirl * 0.35 * smoothstep(0.2, 0.9, r);
-      gl_FragColor = vec4(c, smoothstep(1.0, 0.86, r)); }` };
+    void main(){ vec2 p = vUv * 2.0 - 1.0; p.x *= 0.6; float r = length(p), ang = atan(p.y, p.x);
+      float rim = 0.84 + 0.07 * sin(ang * 7.0 + t * 1.3) + 0.04 * sin(ang * 13.0 - t * 2.1) + 0.03 * sin(ang * 23.0 + t * 3.0);
+      if (r > rim) discard; float k = r / rim;
+      float a = ang + t * 0.7 + 2.4 / (k + 0.3), swirl = 0.5 + 0.5 * sin(a * 4.0 - k * 10.0 + t * 1.6);
+      vec3 core = vec3(0.02, 0.0, 0.03), deep = vec3(0.32, 0.03, 0.12), violet = vec3(0.30, 0.10, 0.45), ember = vec3(1.0, 0.42, 0.18);
+      vec3 c = mix(core, mix(deep, violet, swirl * 0.6), smoothstep(0.15, 0.85, k));
+      c = mix(c, ember, smoothstep(0.86, 0.99, k) * (0.7 + 0.3 * swirl));
+      gl_FragColor = vec4(c, 0.94); }` };
 function addPortal3d(site) {
   const g = new THREE.Group(); g.userData = { at: site, phase: Math.random() * 6, haloSize: 22 };
-  const vortex = new THREE.Mesh(new THREE.PlaneGeometry(10, 16), new THREE.ShaderMaterial({ uniforms: { t: { value: 0 } }, vertexShader: VORTEX.vertex, fragmentShader: VORTEX.fragment, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
-  vortex.position.y = 9.5; g.add(vortex); g.userData.vortex = vortex;
+  const vortex = new THREE.Mesh(new THREE.PlaneGeometry(8, 13), new THREE.ShaderMaterial({ uniforms: { t: { value: 0 } }, vertexShader: VORTEX.vertex, fragmentShader: VORTEX.fragment, transparent: true, depthWrite: false, side: THREE.DoubleSide }));
+  vortex.position.y = 8; g.add(vortex); g.userData.vortex = vortex;
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 4.5, 60, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xff3a3a, transparent: true, opacity: 0.12, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
   beam.position.y = 30; g.add(beam);
   const ring = groundRing(0xd8342c, 9, 10.5); g.add(ring); g.userData.ring = ring;
   if (H.sigil) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), new THREE.MeshBasicMaterial({ map: H.sigil, color: 0xff5040, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })); sg.rotation.x = -Math.PI / 2; sg.position.y = 0.25; g.add(sg); g.userData.sigil = sg; }
-  const hl = halo(0xff4a5c, 22); hl.position.y = 9.5; g.add(hl); g.userData.halo = hl;
+  const hl = halo(0xd8344c, 16); hl.position.y = 8; g.add(hl); g.userData.halo = hl; g.userData.haloSize = 16;
   const orbit = new THREE.Group(); g.add(orbit); g.userData.spin = orbit; // drifting shards
   (async () => {
     for (let i = 0; i < 5; i++) { const r = await fitModel(['rock1', 'rock2', 'rock3'][i % 3], 1.6 + (i % 2)); if (!r) continue; const a = (i / 5) * Math.PI * 2; r.position.set(Math.cos(a) * 8, 6 + (i % 3) * 3, Math.sin(a) * 8); r.rotation.set(i, i * 2, 0); orbit.add(r); }
