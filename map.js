@@ -1,7 +1,7 @@
 // Tomecraft world map (M6 alpha): MapLibre + OpenFreeMap vector tiles, phone GPS, familiar markers.
 // Location never leaves the device. Needs the hosted site: Claude artifact pages block location and map tiles.
-import * as World from './world.js?v=3';
-import * as Col from './collection.js?v=3';
+import * as World from './world.js?v=4';
+import * as Col from './collection.js?v=4';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -155,7 +155,9 @@ function makeMarker(s) {
   el.innerHTML = `<span class="orbit"></span>${H.icon(`i_${f.abilityId}`, H.css(f.type))}<b>${'◆'.repeat(r.pips)}</b><em>${f.name}</em>`;
   if (H.cfg.rarities.indexOf(r) >= 3) el.classList.add('glow');
   el.onclick = (e) => { e.stopPropagation(); tapSpawn(s); };
-  return new maplibregl.Marker({ element: el }).setLngLat([s.lon, s.lat]).addTo(st.map);
+  const m = new maplibregl.Marker({ element: el }).setLngLat([s.lon, s.lat]).addTo(st.map);
+  el.setAttribute('aria-label', `${f.name}, ${r.label} ${f.type}`); // MapLibre replaces it with "Map marker"
+  return m;
 }
 function refreshRanges() {
   for (const { spawn, marker } of st.markers.values()) marker.getElement().classList.toggle('near', World.inRange(H.cfg, st.pos, spawn, st.acc));
