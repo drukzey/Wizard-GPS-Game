@@ -427,9 +427,9 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 @media (max-width:600px){.tile{min-height:150px;padding:28px 8px 14px}.tile b{font-size:18px}.tile small{font-size:12px}}
 /* loading: static paths, since the sprite variables are not ready yet */
 #loading{background:radial-gradient(ellipse at 50% 40%,#2a2342,#0b0a14 72%)}
-#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=30') center/contain no-repeat;opacity:.9}
+#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=31') center/contain no-repeat;opacity:.9}
 #loading h1{font-size:56px;text-shadow:0 3px 12px #000,0 0 30px #7b5cd666}
-#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=30') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
+#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=31') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
 #loading .lb i{background:linear-gradient(90deg,#b8862e,#f2cf86)}
 #loadT{font:600 15px var(--body);color:#c9bfa8}
 
@@ -477,6 +477,12 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 @media (max-width:600px){.tmGrid{grid-template-columns:repeat(2,minmax(0,1fr));width:min(100%,360px)}.tile{min-height:0}.tile .sprite{width:44%;height:auto}}
 .tmGrid{row-gap:48px;margin-bottom:28px}.tile{overflow:visible}.tile b{position:absolute;left:0;right:0;bottom:-32px;text-align:center;text-shadow:0 2px 6px #000}
 .tile .sprite,.tile .tileFace{margin-top:14%}
+/* Sanctuary building markers: a compact emblem with the level; the name appears on hover or focus */
+.hLabel{border:0;background:var(--u-f_ring) center/contain no-repeat,radial-gradient(circle,#141a1b 56%,transparent 58%);width:44px;height:44px;padding:0;justify-content:center;border-radius:50%;filter:drop-shadow(0 2px 4px #000)}
+.hLabel .sprite{width:20px;height:20px}
+.hLabel small{position:absolute;right:-4px;bottom:-4px;min-width:18px;height:18px;border-radius:9px;background:#7a2a22;border:1.5px solid #d7b26b;color:var(--bone);font:700 11px var(--body);display:flex;align-items:center;justify-content:center}
+.hLabel .hName{position:absolute;bottom:calc(100% + 4px);left:50%;transform:translateX(-50%);padding:2px 8px;background:#0b0e0fe6;font:700 14px var(--display);display:none}
+.hLabel:hover .hName,.hLabel:focus-visible .hName{display:block}
 </style>
 </head>
 <body>
@@ -657,6 +663,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=30"></script>
+<script type="module" src="game.js?v=31"></script>
 </body>
 </html>

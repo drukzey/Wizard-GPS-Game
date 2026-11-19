@@ -153,7 +153,7 @@ for i in range(9):
     th = i / 9 * 2 * math.pi; put(random.choice(['SM_Env_Reeds_01', 'SM_Env_Reeds_02', 'SM_Env_Reeds_03']), POND.x + 4.9 * math.cos(th), POND.y + 4.9 * math.sin(th), h=random.uniform(0.9, 1.5))
 for i in range(4): put(random.choice(['SM_Env_Lily_01', 'SM_Env_Lily_02']), POND.x + random.gauss(0, 1.8), POND.y + random.gauss(0, 1.8), z=-0.73, w=0.9)
 wf = put('SM_Env_Water_Slope_01', R * 0.99, POND.y, w=4.5, rot=0, z=-3.5)
-put('SM_Env_Bridge_Stone_01', POND.x - 6.2, POND.y + 1, w=5.5, rot=math.pi / 2)
+# put('SM_Env_Bridge_Stone_01', POND.x - 6.2, POND.y + 1, w=5.5, rot=math.pi / 2)
 # the approach: a stone arch on the front edge, a lantern-lined path to the plot, a statue and a gazebo to either side
 put('SM_Bld_House_StoneArch_01', 0, -24.5, h=4.6, rot=0)
 for i, y in enumerate([-22, -19, -16]):

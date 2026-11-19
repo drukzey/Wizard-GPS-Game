@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=30';
-import * as Col from './collection.js?v=30';
+import * as World from './world.js?v=31';
+import * as Col from './collection.js?v=31';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -241,7 +241,7 @@ function addPortal3d(site) {
 const trees = { cells: new Set(), group: null };
 // Groves, not a sprinkle: each 60 m patch of park or woodland gets at most one grove of 3-6 trees with shrubs at their feet,
 // spaced apart, kept clear of shrines and portals, and only drawn near the wizard so the distance stays readable.
-const FLORA = { park: [['tree', 9, 11], ['tree2', 8, 10], ['tree3', 8, 10], ['oak', 11, 14]], wood: [['pines', 12, 16], ['pines2', 12, 16], ['thin', 9, 12], ['tree3', 8, 10]], under: [['shrubs', 1.6, 2.4], ['fern', 1.0, 1.6], ['bush1', 1.2, 1.8]] };
+const FLORA = { park: [['tree', 14, 17], ['tree2', 13, 16], ['tree3', 13, 16], ['oak', 17, 21]], wood: [['pines', 18, 24], ['pines2', 18, 24], ['thin', 14, 18], ['tree3', 13, 16]], under: [['shrubs', 2.4, 3.4], ['fern', 1.6, 2.4], ['bush1', 2, 2.8]] }; // larger than life, in step with the figures
 async function floraModel(name) {
   trees.src[name] ||= (async () => { const m = await H.loadModel(name, true); if (!m) return null; const b = new THREE.Box3().setFromObject(m); return { m, h: b.max.y - b.min.y }; })();
   return trees.src[name];
@@ -261,7 +261,7 @@ async function plantTrees() {
     if (mid.x < 0 || mid.y < 0 || mid.x > cv.clientWidth || mid.y > cv.clientHeight) continue; // only judge ground the map has drawn
     trees.cells.add(key);
     let h = 0; for (const ch of key) h = (h * 31 + ch.charCodeAt(0)) >>> 0; const r = rng(h);
-    if (r() > 0.6) continue; // open lawns between groves
+    if (r() > 0.7) continue; // open lawns between groves
     const centre = { lat: lat0 + (0.2 + r() * 0.6) * c.latStep, lon: lon0 + (0.2 + r() * 0.6) * c.lonStep }, kind = green(centre);
     if (!kind || !clear(centre)) continue;
     const mPerLat = 111320, mPerLon = 111320 * Math.cos((centre.lat * Math.PI) / 180), placed = [];
@@ -274,7 +274,7 @@ async function plantTrees() {
         const l = local(p); t.position.set(l.x, 0, l.z); t.userData.at = p; trees.group.add(t); placed.push([gx, gz]);
       }
     };
-    await add(FLORA[kind], 3 + Math.floor(r() * 4), 9, 5.5);
+    await add(FLORA[kind], 3 + Math.floor(r() * 4), 11, 8);
     await add(FLORA.under, 2 + Math.floor(r() * 3), 6, 2.5);
   }
   for (const t of trees.group.children) t.visible = Math.hypot(t.position.x - local(st.pos).x, t.position.z - local(st.pos).z) < 330;
