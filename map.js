@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=40';
-import * as Col from './collection.js?v=40';
+import * as World from './world.js?v=41';
+import * as Col from './collection.js?v=41';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -56,7 +56,7 @@ export function returnToWorld() { $('world').hidden = false; st.open = true; sca
 function createMap() {
   const start = H.cfg.world.demoStart;
   // The camera is locked to the wizard: dragging turns it around them, pinch and wheel zoom in and out around them.
-  st.map = new maplibregl.Map({ container: 'worldMap', style: STYLE, center: [start.lon, start.lat], zoom: ZOOM, pitch: PITCH, bearing: 0,
+  st.map = new maplibregl.Map({ container: 'worldMap', style: STYLE, pixelRatio: Math.min(devicePixelRatio, 1.5), fadeDuration: 0, maxTileCacheSize: 60, center: [start.lon, start.lat], zoom: ZOOM, pitch: PITCH, bearing: 0,
     attributionControl: false, maxPitch: 72, minZoom: 16.6, maxZoom: 20.3, dragPan: false, dragRotate: false, keyboard: false, doubleClickZoom: false, touchPitch: false });
   st.map.scrollZoom.enable({ around: 'center' }); st.map.touchZoomRotate.enable({ around: 'center' });
   orbitControls(st.map.getCanvasContainer());
@@ -80,7 +80,7 @@ function fantasyStyle(map) {
       else if (/building/.test(id)) set(id, 'fill-color', '#3d3a4f');
       else set(id, 'fill-color', '#29303a');
       set(id, 'fill-outline-color', 'rgba(0,0,0,0)');
-    } else if (l.type === 'fill-extrusion') { set(id, 'fill-extrusion-color', ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 10], 0, '#3b3650', 40, '#57507a']); set(id, 'fill-extrusion-opacity', 0.94); }
+    } else if (l.type === 'fill-extrusion') { hide(id); /* flat buildings: 3D blocks cost more than they add */ set(id, 'fill-extrusion-color', ['interpolate', ['linear'], ['coalesce', ['get', 'render_height'], 10], 0, '#3b3650', 40, '#57507a']); set(id, 'fill-extrusion-opacity', 0.94); }
     else if (l.type === 'line') {
       if (/water|river|stream|canal/.test(id)) set(id, 'line-color', '#2a8fa8');
       else if (/path|footway|track|pedestrian|cycle|steps/.test(id)) { set(id, 'line-color', '#f2cf86'); set(id, 'line-opacity', 0.85); set(id, 'line-dasharray', [1, 0]); paths.push(l); }
@@ -124,7 +124,7 @@ const layer3d = {
     const sun = new THREE.DirectionalLight(0xffe2b8, 2.0); sun.position.set(30, 80, 20); g3.scene.add(sun);
     g3.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
     g3.renderer.autoClear = false; g3.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    buildWizard(); buildMotes();
+    buildWizard();
   },
   render(gl, matrix) {
     if (!st.pos) return;
@@ -162,7 +162,6 @@ const layer3d = {
     }
 
     g3.renderer.resetState(); g3.renderer.render(g3.scene, g3.cam);
-    st.map.triggerRepaint();
   },
 };
 function buildMotes() { // fireflies and drifting sparks around the wizard
@@ -193,7 +192,6 @@ async function addShrine3d(site) {
   g3.things.set(site.id, g); const p = local(site); g.position.set(p.x, 0, p.z); g3.scene.add(g);
   const ring = groundRing(new THREE.Color(T.glow), 4.2, 5.2); g.add(ring); g.userData.ring = ring;
   const h = halo(new THREE.Color(T.glow), 16); h.position.y = 6; g.add(h); g.userData.halo = h;
-  const m = await fitModel(T.model, 9); if (m && g3.things.get(site.id) === g) g.add(m);
 }
 function setOrigin(pos) {
   g3.origin = { ...pos }; g3.merc = maplibregl.MercatorCoordinate.fromLngLat([pos.lon, pos.lat], 0);
@@ -216,9 +214,11 @@ function groundRing(color, r0, r1) {
   const m = new THREE.Mesh(new THREE.RingGeometry(r0, r1, 48), new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.7, depthWrite: false, side: THREE.DoubleSide }));
   m.rotation.x = -Math.PI / 2; m.position.y = 0.2; return m;
 }
-function addFamiliar3d(s) {
+async function addFamiliar3d(s) {
   const f = H.cfg.familiars[s.familiarId], r = H.rarityCfg(s.rarity);
   const g = new THREE.Group(); g.userData = { at: s, model: f.model, phase: Math.random() * 6 };
+  g3.things.set(s.id, g);
+  await H.ensureModel(f.model); if (g3.things.get(s.id) !== g) return; // gone while loading
   const body = H.instance(f.model);
   if (body) { body.userData.s0 = SCALE * 1.3; body.scale.setScalar(SCALE * 1.3); body.userData.anim?.setLoco({ idle: 0.7, menace: 0.3 }); g.add(body); g.userData.body = body; g.userData.anim = body.userData.anim; }
   const ring = groundRing(new THREE.Color(r.color), 3.6, 4.8); g.add(ring); g.userData.ring = ring;
@@ -246,19 +246,11 @@ function addPortal3d(site) {
   const ring = groundRing(0xd8342c, 9, 10.5); g.add(ring); g.userData.ring = ring;
   if (H.sigil) { const sg = new THREE.Mesh(new THREE.PlaneGeometry(22, 22), new THREE.MeshBasicMaterial({ map: H.sigil, color: 0xff5040, transparent: true, opacity: 0.55, depthWrite: false, blending: THREE.AdditiveBlending })); sg.rotation.x = -Math.PI / 2; sg.position.y = 0.25; g.add(sg); g.userData.sigil = sg; }
   const hl = halo(0xd8344c, 16); hl.position.y = 8; g.add(hl); g.userData.halo = hl; g.userData.haloSize = 16;
-  const orbit = new THREE.Group(); g.add(orbit); g.userData.spin = orbit; // drifting shards
-  (async () => {
-    for (let i = 0; i < 5; i++) { const r = await fitModel(['rock1', 'rock2', 'rock3'][i % 3], 1.6 + (i % 2)); if (!r) continue; const a = (i / 5) * Math.PI * 2; r.position.set(Math.cos(a) * 8, 6 + (i % 3) * 3, Math.sin(a) * 8); r.rotation.set(i, i * 2, 0); orbit.add(r); }
-    // a broken ring of ruins behind and beside the tear, and two torches flanking the way in
-    for (const [name, h, a, d] of [['df_ruin2', 14, Math.PI, 11], ['df_ruin1', 9, Math.PI * 0.62, 12], ['df_ruin3', 9, -Math.PI * 0.62, 12]]) {
-      const r = await fitModel(name, h); if (!r) continue; r.position.x += Math.sin(a) * d; r.position.z += Math.cos(a) * d; r.rotation.y = a; g.add(r);
-    }
-    for (const x of [-6, 6]) { const t = await fitModel('df_torch', 5); if (!t) continue; t.position.set(x, t.position.y, 8); g.add(t); const hl2 = halo(0xff9a4a, 6); hl2.position.set(x, 5.4, 8); g.add(hl2); }
-  })();
   const p = local(site); g.position.set(p.x, 0, p.z); g3.scene.add(g); g3.things.set(site.id, g);
 }
 // Scenery: trees on the map's parks and grass, at fixed spots per cell so they never shuffle. Cheap Kingdom tree model.
 const trees = { cells: new Set(), group: null };
+const SCENERY = false; // groves and lanterns are off while the map is kept light
 // Groves, not a sprinkle: each 60 m patch of park or woodland gets at most one grove of 3-6 trees with shrubs at their feet,
 // spaced apart, kept clear of shrines and portals, and only drawn near the wizard so the distance stays readable.
 const FLORA = { park: [['tree', 14, 17], ['tree2', 13, 16], ['tree3', 13, 16], ['oak', 17, 21]], wood: [['pines', 18, 24], ['pines2', 18, 24], ['thin', 14, 18], ['tree3', 13, 16]], under: [['shrubs', 2.4, 3.4], ['fern', 1.6, 2.4], ['bush1', 2, 2.8]] }; // larger than life, in step with the figures
@@ -267,7 +259,7 @@ async function floraModel(name) {
   return trees.src[name];
 }
 async function plantTrees() {
-  if (!g3.scene || !g3.origin) return;
+  if (!SCENERY || !g3.scene || !g3.origin) return;
   if (!trees.group) { trees.group = new THREE.Group(); g3.scene.add(trees.group); trees.src = {}; }
   const W = { ...H.cfg.world, cellM: 60 }, c = World.cellOf(W, st.pos.lat, st.pos.lon), cv = st.map.getCanvas();
   const rng = (h) => () => ((h = (h * 1664525 + 1013904223) >>> 0) / 4294967296);
@@ -413,7 +405,9 @@ function scan(force) {
   const keep = new Set([...spawns.map((s) => s.id), ...sites.map((s) => s.id), ...shrineSites.map((s) => s.id)]);
   for (const [id, m] of [...st.markers, ...st.rifts, ...st.shrines]) if (!keep.has(id)) { m.remove(); st.markers.delete(id); st.rifts.delete(id); st.shrines.delete(id); removeThing(id); }
   for (const s of shrineSites) if (!st.shrines.has(s.id)) { st.shrines.set(s.id, hitMarker(s, () => tapShrine(s), s.name || H.cfg.shrines.types[s.type].name, 'shrine')); addShrine3d(s); }
-  for (const s of spawns) if (!st.markers.has(s.id)) { st.markers.set(s.id, hitMarker(s, () => tapSpawn(s), spawnLabel(s))); addFamiliar3d(s); }
+  for (const s of spawns) if (!st.markers.has(s.id)) st.markers.set(s.id, hitMarker(s, () => tapSpawn(s), spawnLabel(s)));
+  const near3d = new Set(spawns.filter((s) => s.distance < 170).sort((a, b) => a.distance - b.distance).slice(0, 6).map((s) => s.id)); // RAM: each animated figure costs a skeleton and a mixer
+  for (const s of spawns) { const has = g3.things.has(s.id); if (near3d.has(s.id) && !has) addFamiliar3d(s); else if (!near3d.has(s.id) && has) removeThing(s.id); }
   for (const s of sites) if (!st.rifts.has(s.id)) { st.rifts.set(s.id, hitMarker(s, () => tapRift(s), H.cfg.rifts.find((r) => r.id === s.riftId).name, 'rift')); addPortal3d(s); }
   st.spawns = spawns; st.sites = sites; st.shrineSites = shrineSites;
   plantTrees();
@@ -540,6 +534,8 @@ function walkView(dt) {
 export function tickWorld(dt) {
   if (!st.open || !st.pos) return;
   walkView(dt);
+  st.frameT = (st.frameT || 0) + dt; // the 3D figures animate at 30 fps; nothing redraws while a page covers the map
+  if (st.frameT >= 1 / 30 && !(H.covered && H.covered())) { st.frameT = 0; st.map.triggerRepaint(); }
   if (st.demo && st.demoTarget) {
     const d = World.distanceM(st.pos, st.demoTarget), step = H.cfg.world.demoWalkMps * dt;
     if (d <= step) { setPosition(st.demoTarget.lat, st.demoTarget.lon, 5, false); st.demoTarget = null; }

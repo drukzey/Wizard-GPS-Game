@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=40';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=40';
-import * as Col from './collection.js?v=40';
-import * as P from './progression.js?v=40';
-import * as S from './sanctuary.js?v=40';
-import * as Stage from './stage.js?v=40';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=40';
-import * as World from './world.js?v=40';
+import { createSim } from './sim.js?v=41';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=41';
+import * as Col from './collection.js?v=41';
+import * as P from './progression.js?v=41';
+import * as S from './sanctuary.js?v=41';
+import * as Stage from './stage.js?v=41';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=41';
+import * as World from './world.js?v=41';
 
 const $ = (id) => document.getElementById(id);
-const VER = 40; // cache-busting version, kept in step by stamp.py
+const VER = 41; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -33,8 +33,8 @@ document.body.classList.toggle('touch', isTouch);
 
 // ---------- three setup ----------
 const renderer = new THREE.WebGLRenderer({ canvas: $('c'), antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
-renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFShadowMap;
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 const scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0f1416);
@@ -122,16 +122,16 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=40`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=41`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
   tick('Interface');
-  for (const [k, f] of Object.entries(ATLAS)) assets.atlas[k] = await loadTexture(f);
+  await ensureAtlas('kingdom');
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=40')).default, ...(await import('./pub/anims_m5.js?v=40')).default, ...(await import('./pub/anims_custom.js?v=40')).default };
+    const packed = { ...(await import('./pub/anims.js?v=41')).default, ...(await import('./pub/anims_m5.js?v=41')).default, ...(await import('./pub/anims_custom.js?v=41')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -140,15 +140,27 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=40')).default, ...(await import('./pub/models_m4.js?v=40')).default };
-  for (const [k, [atl, h]] of Object.entries(MODELS)) {
+  await ensureModel('mage');
+  tick('Models');
+}
+
+// Models and atlases load on first use, one file each, so start-up only fetches the wizard and the map.
+const atlasP = {}, modelP = {};
+function ensureAtlas(k) { return (atlasP[k] ||= loadTexture(ATLAS[k]).then((t) => (assets.atlas[k] = t))); }
+const packed = (k) => import(`./pub/m/${k}.js?v=${VER}`).then((m) => m.default);
+/** Load, unpack and prepare one character model (and its portrait). Safe to call many times. */
+function ensureModel(k) {
+  if (!MODELS[k]) return Promise.resolve(null);
+  return (modelP[k] ||= (async () => {
+    const [atl, h] = MODELS[k];
     try {
-      const obj = fbx.parse(await gunzipB64(models[k]), '');
+      await ensureAtlas(atl);
+      const obj = fbx.parse(await gunzipB64(await packed(k)), '');
       if (k === 'fairy') { // wings are separate meshes in the same space: pin them to the upper spine
         obj.updateMatrixWorld(true);
         let spine = null; obj.traverse((o) => { if (/spine_03$/i.test(o.name)) spine = o; });
         for (const w of ['fairy_wing_l', 'fairy_wing_r']) {
-          const wing = fbx.parse(await gunzipB64(models[w]), ''); obj.add(wing); obj.updateMatrixWorld(true);
+          const wing = fbx.parse(await gunzipB64(await packed(w)), ''); obj.add(wing); obj.updateMatrixWorld(true);
           if (spine) { // the wing meshes come in at hip height: lift each so its middle sits just below the upper spine, then pin it there
             const c = new THREE.Box3().setFromObject(wing).getCenter(new THREE.Vector3()), sp = spine.getWorldPosition(new THREE.Vector3());
             const box = new THREE.Box3().setFromObject(obj), H = box.max.y - box.min.y;
@@ -160,10 +172,13 @@ async function loadAll() {
       }
       if (h && !assets.lib) relaxArms(obj);
       assets.models[k] = prep(obj, assets.atlas[atl], h);
-    } catch (err) { console.warn(`[assets] ${k} failed`, err); }
-  }
-  tick('Models');
+      shootPortrait(k);
+      return assets.models[k];
+    } catch (err) { console.warn(`[assets] ${k} failed`, err); return null; }
+  })());
 }
+const ensureModels = (keys) => Promise.all([...new Set(keys)].map(ensureModel));
+const famModels = (ids) => ids.map((f) => cfg.familiars[f]?.model).filter(Boolean);
 // Sanctuary buildings, decorations and staffs load on first use (Kingdom atlas), then are cloned.
 const modelCache = {};
 const GLASS = new Set(['house_04', 'house_08', 'house_05', 'blacksmith', 'house_03', 'tower']);
@@ -171,7 +186,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=40')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=41')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       const df = name.startsWith('df_'); // Dark Fantasy pieces use their own atlas, and their fire and runes glow
@@ -208,25 +223,33 @@ function instance(key) {
 
 // Portraits: each familiar (and the wizard's face) rendered once from its real model, used across the interface.
 const portraits = {};
-function makePortraits() {
-  const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
-  r.setSize(256, 256, false); r.outputColorSpace = THREE.SRGBColorSpace;
-  const sc = new THREE.Scene(); sc.add(new THREE.HemisphereLight(0xe8eef0, 0x2a2018, 2.2));
-  const key = new THREE.DirectionalLight(0xffe2b8, 2.2); key.position.set(2, 3, 4); sc.add(key);
-  const rim = new THREE.DirectionalLight(0x7fd6c4, 1.6); rim.position.set(-3, 2, -3); sc.add(rim);
-  const camP = new THREE.PerspectiveCamera(30, 1, 0.05, 50);
-  const shot = (key, face) => {
-    const g = instance(key); if (!g) return null;
-    sc.add(g); g.rotation.y = face ? 0 : 0.45;
-    const box = new THREE.Box3().setFromObject(g), h = box.max.y - box.min.y;
-    if (face) { camP.position.set(0, h * 0.8, h * 1.05); camP.lookAt(0, h * 0.76, 0); } // head and shoulders
-    else { camP.position.set(0, h * 0.55, h * 2.05); camP.lookAt(0, h * 0.48, 0); }
-    r.render(sc, camP); sc.remove(g); return r.domElement.toDataURL('image/png');
-  };
-  for (const [fid, f] of Object.entries(cfg.familiars)) portraits[fid] = shot(f.model, false);
-  portraits.mage = shot('mage', true);
-  for (const [eid, e] of Object.entries(cfg.enemies)) portraits[eid] = shot(e.model, false);
-  r.dispose();
+let portraitR = null, portraitT = null;
+function shootPortrait(key) {
+  const g = instance(key); if (!g) return;
+  if (!portraitR) {
+    portraitR = { r: new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }), sc: new THREE.Scene(), cam: new THREE.PerspectiveCamera(30, 1, 0.05, 50) };
+    portraitR.r.setSize(160, 160, false); portraitR.r.outputColorSpace = THREE.SRGBColorSpace;
+    portraitR.sc.add(new THREE.HemisphereLight(0xe8eef0, 0x2a2018, 2.2));
+    const key2 = new THREE.DirectionalLight(0xffe2b8, 2.2); key2.position.set(2, 3, 4); portraitR.sc.add(key2);
+    const rim = new THREE.DirectionalLight(0x7fd6c4, 1.6); rim.position.set(-3, 2, -3); portraitR.sc.add(rim);
+  }
+  const { r, sc, cam: camP } = portraitR, face = key === 'mage';
+  sc.add(g); g.rotation.y = face ? 0 : 0.45;
+  const box = new THREE.Box3().setFromObject(g), h = box.max.y - box.min.y;
+  if (face) { camP.position.set(0, h * 0.8, h * 1.05); camP.lookAt(0, h * 0.76, 0); } // head and shoulders
+  else { camP.position.set(0, h * 0.55, h * 2.05); camP.lookAt(0, h * 0.48, 0); }
+  r.render(sc, camP); sc.remove(g);
+  const url = r.domElement.toDataURL('image/webp', 0.85);
+  if (face) portraits.mage = url;
+  for (const [id, f] of [...Object.entries(cfg.familiars), ...Object.entries(cfg.enemies)]) if (f.model === key) portraits[id] = url;
+  clearTimeout(portraitT); portraitT = setTimeout(refreshPortraits, 120); // repaint the interface once a batch has arrived
+  clearTimeout(portraitR.t); portraitR.t = setTimeout(() => { portraitR.r.dispose(); portraitR.r.forceContextLoss(); portraitR = null; }, 4000); // free the extra GL context when idle
+}
+function refreshPortraits() {
+  if (!col) return;
+  renderAvatar(); renderNearbyButton(); renderTomeTiles();
+  if (!$('menu').hidden) showTab(campTab);
+  if (!$('nearbyPanel').hidden) renderNearby();
 }
 /** Round portrait with the ability glyph as a small badge, so identity is the creature and the ability stays readable. */
 const famFace = (fid, unknown = false) => { const f = cfg.familiars[fid];
@@ -1209,7 +1232,11 @@ function clearVisuals() {
   for (const f of vis.fx) { if (f.mesh) fxGroup.remove(f.mesh); if (f.el) f.el.remove(); }
   vis.enemies.clear(); vis.projectiles.clear(); vis.zones.clear(); vis.fx.length = 0; lastPos.clear();
 }
-function startBattle(rift = null, portal = false) {
+let arenaBuilt = false;
+async function startBattle(rift = null, portal = false) {
+  const need = ['base_dungeon', ...famModels(loadout), ...Object.values(cfg.enemies).map((e) => e.model)]; // bosses summon others, so bring every enemy
+  if (need.some((k) => !assets.models[k])) { toast('Opening the way…'); await ensureModels(need); }
+  if (!arenaBuilt) { buildArena(cfg); arenaBuilt = true; }
   store.set('ww.loadout', loadout);
   const prev = settleRun(); // starting again mid-run still pays out the run so far
   if (prev && prev.rw.xp) toast(`Previous run: +${prev.rw.xp} XP, +${prev.rw.gold} Gold`);
@@ -1290,7 +1317,7 @@ function showPreview(container, familiarId, color, mood = 'idle') {
   }
   preview.ground.visible = full; preview.scene.background = full ? preview.sky : null; preview.scene.fog = full ? new THREE.Fog(0x2a3a3a, 8, 26) : null;
   const w = full ? innerWidth : Math.max(10, Math.round(container.clientWidth * 0.64)), hh = full ? innerHeight : w;
-  preview.renderer.setPixelRatio(Math.min(devicePixelRatio, 2)); preview.renderer.setSize(w, hh, false); preview.cam.aspect = w / hh; preview.cam.updateProjectionMatrix();
+  preview.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); preview.renderer.setSize(w, hh, false); preview.cam.aspect = w / hh; preview.cam.updateProjectionMatrix();
   if (preview.model) preview.scene.remove(preview.model);
   const f = cfg.familiars[familiarId];
   const g = instance(f.model) || new THREE.Mesh(new THREE.IcosahedronGeometry(0.6), new THREE.MeshLambertMaterial({ color }));
@@ -1342,7 +1369,7 @@ function openBinding(encId, from = 'explore') {
   $('bindMsg').textContent = `Tap (or press Space) when the light is inside the glowing arc. ${cfg.capture.hitsPerStage} hits per stage, ${cfg.capture.timeLimitSec} seconds. Better timing raises your chance. ${e.attemptsLeft} ${e.attemptsLeft === 1 ? 'try' : 'tries'} left.`;
   $('bindGo').hidden = false; $('bindGo').textContent = 'Begin binding';
   $('menu').hidden = true; $('tomeMenu').hidden = true; $('nearbyPanel').hidden = true; $('bind').hidden = false; paused = true;
-  showPreview($('bindStage'), e.familiarId, TYPE_HEX[f.type], 'menace');
+  ensureModel(f.model).then(() => { if (bind.enc === e) showPreview($('bindStage'), e.familiarId, TYPE_HEX[f.type], 'menace'); });
   drawRing();
 }
 function startStage(stage) {
@@ -1507,26 +1534,26 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=40')).json();
+    cfg = await (await fetch('data/config.json?v=41')).json();
     await loadAll();
-    buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
     if (!Object.keys(col.owned).length) Col.grantStarters(cfg, col, Date.now());
     saveCol();
     prof = P.loadProfile(cfg, store.get('tc.profile', null));
     home = S.loadHome(cfg, store.get('tc.home', null));
     while (prof.presets.length < S.facilityEffect(cfg, home, 'chamber').presets) prof.presets.push(null);
-    Stage.initStage({ instance, assets, loadModel, decal, ver: VER, cfg: () => cfg, reducedMotion: () => settings.reducedMotion });
-    Stage.buildHub(); Stage.buildHome(cfg);
+    Stage.initStage({ instance, ensureModel, assets, loadModel, decal, ver: VER, cfg: () => cfg, reducedMotion: () => settings.reducedMotion });
+    Stage.buildHub();
     if (!loadout || loadout.length !== 3 || loadout.some((f) => !col.owned[f])) loadout = [...cfg.starters];
     renderLegend();
     setInterval(tickWilds, 1000);
     initWorld({ cfg, col: () => col, saveCol, rarityCfg, icon, css, toast, openBinding,
       store, instance, loadModel, attachStaff: Stage.attachStaff, staffModel: () => weaponModel(), creatureIdle: Stage.creatureIdle, openRift, visitShrine, onNearby: renderNearby,
-      face: (fid) => (unknownSpecies(fid) ? '' : portraits[fid] || ''), sigil: assets.tex.sigilL });
-    await Stage.setHubLoadout(loadout, weaponModel());
+      face: (fid) => (unknownSpecies(fid) ? '' : portraits[fid] || ''), sigil: assets.tex.sigilL, ensureModel, covered: () => !$('tomeMenu').hidden || !$('menu').hidden || !$('bind').hidden || !$('reveal').hidden });
     $('loading').remove();
-    makePortraits(); renderAvatar(); renderNearbyButton();
+    renderAvatar(); renderNearbyButton();
+    // after the map is up, quietly fetch the team (for the stage) and then the rest of the collection's faces, one at a time
+    (async () => { await ensureModels(famModels(loadout)); for (const f of famModels(Object.keys({ ...col.owned, ...col.seen }))) { await new Promise((r) => setTimeout(r, 400)); await ensureModel(f); } })();
     toggleMenu(false);
     camTarget.set(0, 0, 4); cam.position.copy(camTarget).add(CAM_OFF); cam.lookAt(camTarget);
     frame();

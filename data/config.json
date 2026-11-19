@@ -1619,19 +1619,6 @@
       }
     },
     {
-      "id": "craft",
-      "text": "Forge a piece of gear",
-      "kind": "gear",
-      "n": 1,
-      "go": "home",
-      "reward": {
-        "xp": 30,
-        "materials": {
-          "runeFragments": 2
-        }
-      }
-    },
-    {
       "id": "shallow",
       "text": "Clear the Shallow Rift",
       "kind": "rift",

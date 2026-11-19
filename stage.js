@@ -80,7 +80,8 @@ export async function attachStaff(wizard, modelName) {
 
 export async function setHubLoadout(teamIds, weaponModel) {
   if (weaponModel !== hub.weaponModel && hub.wizard) { hub.weaponModel = weaponModel; await attachStaff(hub.wizard, weaponModel); }
-  if (teamIds.join() === hub.teamIds.join()) return;
+  if (teamIds.join() === hub.teamIds.join() && hub.team.length === teamIds.length) return;
+  await Promise.all(teamIds.map((fid) => D.ensureModel(D.cfg().familiars[fid].model)));
   hub.teamIds = [...teamIds];
   for (const g of hub.team) hub.platform.remove(g);
   const spots = [[-2.5, 0.2, 0.25], [0, -0.5, 0], [2.5, 0.2, -0.25]]; // a row across the platform, centred on the middle one
