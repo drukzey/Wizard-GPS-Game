@@ -3,7 +3,7 @@ FBX models and animation clips -> gzip + base64 JS modules (host does not serve 
 HUD sprites -> resized PNGs in ui/.
 Run: python3 -I build.py
 """
-import base64, gzip, json, os, shutil
+import base64, gzip, json, os, shutil, sys
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -73,7 +73,13 @@ def pack(files, out_name):
     return os.path.getsize(os.path.join(OUT, out_name))
 
 
-if __name__ == '__main__':
+R = f'{UP}/POLYGON_Fantasy_Rivals_SourceFiles_v4/FBX/Characters'
+MODELS_M4 = {'mech_golem': f'{R}/SK_BR_Character_MechanicalGolem_01.fbx', 'ancient_warrior': f'{R}/SK_Character_Ancient_Warrior_01.fbx',
+             'evil_god': f'{R}/SK_Character_EvilGod_01.fbx'}
+
+if __name__ == '__main__' and sys.argv[1:] == ['m4']:  # M4 enemies only: python3 -I build.py m4
+    print('models_m4.js', pack(MODELS_M4, 'models_m4.js'))
+elif __name__ == '__main__':
     os.makedirs(OUT, exist_ok=True)
     for f in os.listdir(OUT):
         os.remove(os.path.join(OUT, f))

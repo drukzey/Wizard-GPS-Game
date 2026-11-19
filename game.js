@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=7';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=7';
-import * as Col from './collection.js?v=7';
-import * as P from './progression.js?v=7';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=7';
+import { createSim } from './sim.js?v=8';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=8';
+import * as Col from './collection.js?v=8';
+import * as P from './progression.js?v=8';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen } from './map.js?v=8';
 
 const $ = (id) => document.getElementById(id);
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
@@ -63,7 +63,8 @@ manager.setURLModifier((u) => (/\.(png|tga|jpe?g|psd|tif)$/i.test(u) ? PIXEL : u
 const fbx = new FBXLoader(manager);
 const MODELS = { mage: ['kingdom', 1.85], spirit_demon: ['rivals', 2.1], fort_golem: ['rivals', 2.5], medusa: ['rivals', 2.1],
   troll: ['rivals', 2.7], dark_elf: ['rivals', 1.95], base_dungeon: ['rivals', 0],
-  mystic: ['rivals', 2.0], elemental_golem: ['rivals', 2.5], fairy: ['kingdom', 1.5], gargoyle: ['darkfantasy', 2.3], parrot: ['pirate', 0.9], squid: ['pirate', 0.9] };
+  mystic: ['rivals', 2.0], elemental_golem: ['rivals', 2.5], fairy: ['kingdom', 1.5], gargoyle: ['darkfantasy', 2.3], parrot: ['pirate', 0.9], squid: ['pirate', 0.9],
+  mech_golem: ['rivals', 2.6], ancient_warrior: ['rivals', 2.0], evil_god: ['rivals', 3.6] };
 const ATLAS = { kingdom: 'assets/kingdom_atlas.png', rivals: 'assets/rivals_atlas.png', darkfantasy: 'assets/darkfantasy_atlas.png', pirate: 'assets/pirate_atlas.png' };
 const UI_SPRITES = ['orbL', 'orbR', 'orbGlass', 'orbSheen', 'ring', 'ringBg', 'bar', 'barBg', 'box', 'circle', 'vignette', 'sigilL', 'sigilM', 'reticle',
   'i_arcane', 'i_runic', 'i_ancient', 'i_dodge', 'i_abl_arcane_bolt', 'i_abl_charged_blast', 'i_abl_spark_fan', 'i_abl_rune_shield',
@@ -111,7 +112,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=7`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=8`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`);
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -120,7 +121,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = (await import('./pub/anims.js?v=7')).default;
+    const packed = (await import('./pub/anims.js?v=8')).default;
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -129,7 +130,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = (await import('./pub/models.js?v=7')).default;
+  const models = { ...(await import('./pub/models.js?v=8')).default, ...(await import('./pub/models_m4.js?v=8')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -225,7 +226,13 @@ function enemyVisual(e) {
   const bg = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.14), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.6, depthTest: false }));
   const fg = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 0.14), new THREE.MeshBasicMaterial({ color: 0xe0424f, depthTest: false }));
   fg.geometry.translate(0.6, 0, 0); fg.position.x = -0.6; fg.position.z = 0.001; bg.renderOrder = fg.renderOrder = 10;
-  hb.add(bg, fg); hb.position.y = (e.def.model === 'troll' ? 3.1 : 2.35); g.add(hb);
+  hb.add(bg, fg); hb.position.y = (MODELS[e.def.model]?.[1] || 2) + 0.4; g.add(hb);
+  if (e.def.archetype === 'boss') hb.scale.set(2.2, 1.6, 1);
+  if (e.def.guardPct) { // the guard arc is drawn on the ground in front of it, and vanishes while it attacks
+    const half = (e.def.guardArcDeg * Math.PI) / 360;
+    const arc = new THREE.Mesh(new THREE.RingGeometry(1.0, 1.35, 24, 1, -Math.PI / 2 - half, half * 2), new THREE.MeshBasicMaterial({ color: 0x9fd4ff, transparent: true, opacity: 0.55, depthWrite: false, side: THREE.DoubleSide }));
+    arc.rotation.x = -Math.PI / 2; arc.position.y = 0.05; g.add(arc); g.userData.guard = arc;
+  }
   g.userData.hb = hb; g.userData.fg = fg;
   g.position.set(e.x, 0, e.z); scene.add(g); return g;
 }
@@ -251,6 +258,13 @@ function sigilFx(x, z, color, size, life) {
 function telegraphFx(ev, enemy) {
   const mat = new THREE.MeshBasicMaterial({ color: 0xff3b3b, transparent: true, opacity: 0.28, depthWrite: false, side: THREE.DoubleSide });
   let m;
+  if (ev.shape === 'circle') { // ground target: drawn where it will land, not on the enemy
+    m = new THREE.Mesh(new THREE.CircleGeometry(ev.radius, 40), mat); m.rotation.x = -Math.PI / 2; m.position.set(ev.x, 0.04, ev.z);
+    const fill = m.clone(); fill.material = mat.clone(); fill.material.opacity = 0.35; fill.position.y = 0.05;
+    addFx(m, ev.time, (f, k) => { m.material.opacity = 0.2 + 0.2 * Math.sin(k * 20) ** 2; });
+    addFx(fill, ev.time, (f, k) => { fill.scale.set(k, k, k); });
+    return;
+  }
   if (ev.shape === 'arc') {
     const half = (ev.arcDeg * Math.PI) / 360;
     m = new THREE.Mesh(new THREE.CircleGeometry(ev.range, 28, Math.PI / 2 - half, half * 2), mat);
@@ -308,7 +322,8 @@ function updateHud() {
   $('mpFill').style.height = `${(100 * p.mana) / P.mana}%`; $('mpT').textContent = Math.floor(p.mana);
   $('stFill').style.transform = `scaleX(${p.stamina / P.stamina})`;
   $('stBar').classList.toggle('low', p.stamina < P.dodge.staminaCost);
-  $('topT').textContent = `Wave ${Math.max(1, sim.state.wave + 1)} · ${p.kills} defeated`;
+  const boss = sim.state.enemies.find((e) => e.def.archetype === 'boss');
+  $('topT').textContent = `${activeRift ? `${activeRift.name} · wave ${Math.max(1, sim.state.wave + 1)} of ${activeRift.waves.length}` : `Wave ${Math.max(1, sim.state.wave + 1)}`} · ${p.kills} defeated${boss ? ` · ${boss.def.name} ${Math.ceil((100 * boss.hp) / boss.maxHp)}%` : ''}`;
   $('vig').style.opacity = settings.reducedMotion ? 0 : Math.max(0, 0.9 - (p.hp / p.maxHp) * 2.6).toFixed(2);
   [...$('abilities').children].forEach((b, i) => {
     const ab = sim.state.slots[i].ab, cd = p.cds[i];
@@ -465,6 +480,7 @@ function sync(dt, t) {
     const ev = velocity(e.id, e.x, e.z, dt), sp = Math.hypot(ev.vx, ev.vz);
     g.position.lerp(tmpV.set(e.x, 0, e.z), 0.6);
     if (e.face) g.rotation.y = Math.atan2(e.face.x, e.face.z);
+    if (g.userData.guard) g.userData.guard.visible = e.mode === 'move';
     const ea = g.userData.anim;
     if (ea) {
       ea.setLoco(sp > 0.3 ? { idle: 0, walk: 1 } : { idle: 1, walk: 0 }, sp > 0.3 ? Math.max(0.6, sp / 1.6) : 1);
@@ -507,7 +523,7 @@ function sync(dt, t) {
   for (const z of st.zones) {
     lz.add(z.id); let m = vis.zones.get(z.id);
     if (!m) {
-      const col = TYPE_HEX[st.slots[z.slot].fam.type], dark = z.slowPct > 0;
+      const col = z.team === 'enemy' ? 0xff3b3b : TYPE_HEX[st.slots[z.slot].fam.type], dark = z.slowPct > 0;
       m = new THREE.Group();
       const disk = new THREE.Mesh(new THREE.CircleGeometry(z.radius, 40), new THREE.MeshBasicMaterial({ color: dark ? 0x241433 : col, transparent: true, opacity: dark ? 0.75 : 0.18, depthWrite: false }));
       disk.rotation.x = -Math.PI / 2; disk.position.y = 0.03; m.add(disk);
@@ -541,20 +557,27 @@ function handleEvents(events) {
       }
       case 'absorbed': if (ev.amount >= 1) floatText(ev.x, ev.z, `-${Math.round(ev.amount)} shield`, '#7fffc4'); break;
       case 'dodged': floatText(ev.x, ev.z, 'Dodged', '#bfe8ff'); break;
+      case 'blocked': floatText(ev.x, ev.z, 'Blocked', '#9fd4ff'); break;
+      case 'phase': banner(`Phase ${ev.phase}: ${ev.name}`); if (!settings.reducedMotion) shakeT = 0.4; break;
+      case 'spawn': if (ev.boss) banner(cfg.enemies[ev.enemyId].name); break;
+      case 'victory':
+        running = false;
+        { const r = settleRun(); setTimeout(() => showResults(r, 'won'), 900); }
+        break;
       case 'telegraph': {
         const e = sim.state.enemies.find((x) => x.id === ev.id); if (e) telegraphFx(ev, e);
         const g = vis.enemies.get(ev.id), ea = g && g.userData.anim;
-        if (ea) ea.playOnce(e && e.def.archetype === 'melee_pursuer' ? 'heavy' : 'stab', ev.time / 0.45);
+        if (ea && !ea.oneShot) ea.playOnce(ev.shape === 'arc' ? 'heavy' : 'stab', ev.time / 0.45);
         break;
       }
       case 'cast': ghostFx(ev.familiarId, ev.x, ev.z, ev.dir); if (pa) pa.playOnce('cast', 0.55); break;
       case 'dodge': ringFx(ev.x, ev.z, 0xe8c547, 0.4, 1.4, 0.3); if (pa) pa.playOnce(rollFor(ev.dir, sim.state.player.facing), 0.5); break;
       case 'projectileEnd': ringFx(ev.x, ev.z, ev.team === 'enemy' ? 0xff6a3d : 0xe9ddff, 0.1, 0.6, 0.2); break;
       case 'notReady': { const b = $('abilities').children[ev.slot]; if (b) { b.classList.remove('shake'); void b.offsetWidth; b.classList.add('shake'); } break; }
-      case 'wave': banner(`Wave ${ev.wave}`); if (ev.wave > 1) waveDiscovery(); break;
+      case 'wave': banner(ev.of ? `Wave ${ev.wave} of ${ev.of}` : `Wave ${ev.wave}`); if (ev.wave > 1) waveDiscovery(); break;
       case 'defeat':
         running = false; if (pa) pa.playOnce('death', 1.2);
-        { const r = settleRun(); setTimeout(() => showResults(r, true), 1400); }
+        { const r = settleRun(); setTimeout(() => showResults(r, 'defeat'), 1400); }
         break;
     }
   }
@@ -585,9 +608,9 @@ function refreshMenu() {
   $('compT').textContent = loadout.length === 3 ? `· composition ${comp}` : '';
   $('pickT').textContent = loadout.length === 3 ? (sim && running && !sameLoadout() ? 'Changing familiars restarts the battle.' : '') : `Pick ${3 - loadout.length} more`;
   $('startBtn').disabled = loadout.length !== 3;
-  $('startBtn').textContent = sim && running && sameLoadout() ? 'Resume' : 'Start battle';
+  $('startBtn').textContent = sim && running && sameLoadout() ? 'Resume' : 'Training waves';
   $('endBtn').hidden = !(sim && running);
-  renderPresets();
+  renderPresets(); renderRifts();
 }
 const mkBtn = (text, fn, cls = 'btn alt sm') => { const b = document.createElement('button'); b.className = cls; b.textContent = text; b.onclick = fn; return b; };
 function renderPresets() {
@@ -618,17 +641,21 @@ function settleRun() {
   if (!sim || !runTx) return null;
   const st = sim.state, tx = runTx; runTx = null;
   const cleared = Math.max(0, st.wave + (st.enemies.some((e) => e.hp > 0) ? 0 : 1));
-  const rw = P.battleRewards(cfg, { kills: st.player.kills, wavesCleared: cleared, slots: st.slots.map((s) => ({ familiarId: s.familiarId, ...s.contrib })) });
+  const won = st.won && !!activeRift;
+  const rw = P.battleRewards(cfg, { kills: st.player.kills, wavesCleared: cleared, clearReward: won ? activeRift.clearReward : null, slots: st.slots.map((s) => ({ familiarId: s.familiarId, ...s.contrib })) });
   const g = P.grant(cfg, prof, tx, rw);
   if (g.applied) Object.assign(prof.stats, { battles: prof.stats.battles + 1, bestWave: Math.max(prof.stats.bestWave, cleared), kills: prof.stats.kills + st.player.kills });
   saveProf();
-  return { cleared, kills: st.player.kills, rw, g, fids: st.slots.map((s) => s.familiarId) };
+  if (g.applied && won) prof.stats.rifts = { ...(prof.stats.rifts || {}), [activeRift.id]: ((prof.stats.rifts || {})[activeRift.id] || 0) + 1 };
+  saveProf();
+  return { cleared, kills: st.player.kills, rw, g, won, rift: activeRift, fids: st.slots.map((s) => s.familiarId) };
 }
-function showResults(r, defeated) {
-  $('resH').textContent = defeated ? 'Defeated' : 'Run complete';
+function showResults(r, outcome) {
+  $('resH').textContent = outcome === 'won' ? `${r.rift.name} cleared!` : outcome === 'defeat' ? 'Defeated' : 'Run complete';
   $('defeatT').textContent = `Waves cleared: ${r.cleared} · Enemies defeated: ${r.kills}`;
   const M = cfg.progression.mastery;
-  let h = r.rw.xp ? `<p><b>+${r.rw.xp} XP · +${r.rw.gold} Gold${r.rw.essence ? ` · +${r.rw.essence} Arcane Essence` : ''}</b></p>` : '<p>No rewards this time. Defeat at least one enemy to earn rewards.</p>';
+  let h = r.won ? `<p class="lvl">Clear bonus: +${r.rift.clearReward.xp} XP · +${r.rift.clearReward.gold} Gold · +${r.rift.clearReward.essence} Arcane Essence (included below)</p>` : '';
+  h += r.rw.xp ? `<p><b>+${r.rw.xp} XP · +${r.rw.gold} Gold${r.rw.essence ? ` · +${r.rw.essence} Arcane Essence` : ''}</b></p>` : '<p>No rewards this time. Defeat at least one enemy to earn rewards.</p>';
   if (r.g.applied && r.g.wizard.to > r.g.wizard.from) h += `<p class="lvl">Wizard level ${r.g.wizard.to}!</p>`;
   for (const fid of r.fids) {
     const m = r.g.mastery?.[fid], f = cfg.familiars[fid];
@@ -674,7 +701,7 @@ function renderDetail() {
   }
 }
 $('detClose').onclick = () => { $('famDet').hidden = true; toggleMenu(true, 'journal'); };
-$('endBtn').onclick = () => { const r = settleRun(); running = false; $('menu').hidden = true; if (r) showResults(r, false); };
+$('endBtn').onclick = () => { const r = settleRun(); running = false; $('menu').hidden = true; if (r) showResults(r, 'ended'); };
 let activeLoadout = null;
 const sameLoadout = () => activeLoadout && activeLoadout.join() === loadout.join();
 function toggleMenu(open, tab) { $('menu').hidden = !open; paused = open; if (open) { if (tab) showTab(tab); refreshMenu(); renderExplore(); renderJournal(); renderWallet(); } }
@@ -687,7 +714,20 @@ function showTab(tab) {
 for (const b of document.querySelectorAll('.tab')) b.onclick = () => showTab(b.dataset.tab);
 $('menuBtn').onclick = () => toggleMenu(true);
 $('startBtn').onclick = () => { if (!(sim && running && sameLoadout())) startBattle(); toggleMenu(false); };
-$('retryBtn').onclick = () => { $('defeat').hidden = true; startBattle(); paused = false; };
+function renderRifts() {
+  const box = $('rifts'); box.innerHTML = '';
+  const lvl = P.levelInfo(cfg, prof.xp).level;
+  for (const r of cfg.rifts) {
+    const locked = lvl < r.minLevel, done = prof.stats.rifts?.[r.id] || 0, c = r.clearReward;
+    const mods = r.modifiers.map((m) => `<b>${cfg.riftModifiers[m].name}</b>: ${cfg.riftModifiers[m].desc}`).join(' · ');
+    const d = document.createElement('div'); d.className = 'preset';
+    d.innerHTML = `<div class="grow"><b>${r.name}</b> <span class="comp">${r.waves.length} ${r.waves.length === 1 ? 'wave' : 'waves'}${done ? ` · cleared ${done}×` : ''}</span>
+      <div class="s">${r.desc}${mods ? `<br>${mods}` : ''}<br>Clear bonus: ${c.xp} XP · ${c.gold} Gold · ${c.essence} Essence${locked ? `<br><span class="lock">Unlocks at wizard level ${r.minLevel}</span>` : ''}</div></div>`;
+    const b = mkBtn('Enter', () => { startBattle(r); toggleMenu(false); }, 'btn sm'); b.disabled = locked || loadout.length !== 3;
+    d.appendChild(b); box.appendChild(d);
+  }
+}
+$('retryBtn').onclick = () => { $('defeat').hidden = true; startBattle(activeRift); paused = false; };
 $('loadoutBtn').onclick = () => { $('defeat').hidden = true; toggleMenu(true); };
 
 function clearVisuals() {
@@ -697,14 +737,15 @@ function clearVisuals() {
   for (const f of vis.fx) { if (f.mesh) fxGroup.remove(f.mesh); if (f.el) f.el.remove(); }
   vis.enemies.clear(); vis.projectiles.clear(); vis.zones.clear(); vis.fx.length = 0; lastPos.clear();
 }
-function startBattle() {
+let activeRift = null;
+function startBattle(rift = null) {
   store.set('ww.loadout', loadout);
   const prev = settleRun(); // switching loadouts mid-run still pays out the run so far
   if (prev && prev.rw.xp) toast(`Previous run: +${prev.rw.xp} XP, +${prev.rw.gold} Gold`);
-  activeLoadout = [...loadout];
+  activeLoadout = [...loadout]; activeRift = rift;
   clearVisuals();
   const seed = (Math.random() * 1e9) | 0;
-  sim = createSim(cfg, { weaponId: cfg.defaultLoadout.weaponId, familiarIds: activeLoadout, abilities: activeLoadout.map((fid) => P.effectiveAbility(cfg, col, prof, fid)) }, seed);
+  sim = createSim(cfg, { weaponId: cfg.defaultLoadout.weaponId, familiarIds: activeLoadout, abilities: activeLoadout.map((fid) => P.effectiveAbility(cfg, col, prof, fid)) }, seed, { encounter: rift });
   runTx = `battle:${Date.now().toString(36)}:${seed}`;
   if (vis.player) scene.remove(vis.player, vis.player.userData.aimPivot);
   vis.player = playerVisual();
@@ -1007,7 +1048,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=7')).json();
+    cfg = await (await fetch('data/config.json?v=8')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));

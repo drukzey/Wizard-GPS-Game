@@ -118,3 +118,11 @@ test('profile and ascension survive save and load', () => {
   assert.equal(p2.gold, 77); assert.deepEqual(p2.presets[0], ['fam_medusa', 'fam_fort_golem', 'fam_spirit_demon']);
   assert.equal(c2.owned.fam_medusa.ascension, 2);
 });
+
+test('a rift clear bonus is added only to a won run', () => {
+  const rift = cfg.rifts.find((r) => r.id === 'rift_shallow');
+  const base = { kills: 6, wavesCleared: 3, slots: [] };
+  const lost = P.battleRewards(cfg, base), won = P.battleRewards(cfg, { ...base, clearReward: rift.clearReward });
+  assert.equal(won.xp - lost.xp, rift.clearReward.xp);
+  assert.equal(won.essence - lost.essence, rift.clearReward.essence);
+});

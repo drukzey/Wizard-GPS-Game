@@ -50,6 +50,8 @@ export function battleRewards(cfg, result) {
   out.xp = B.xpPerKill * result.kills + B.xpPerWave * waves;
   out.gold = B.goldPerKill * result.kills + B.goldPerWave * waves;
   out.essence = B.essencePerWave * waves;
+  const c = result.clearReward; // rift completed (M4): only passed when the sim reports a win
+  if (c) { out.xp += c.xp || 0; out.gold += c.gold || 0; out.essence += c.essence || 0; }
   for (const s of result.slots) {
     const contrib = s.damage * M.xpPerDamage + s.absorbed * M.xpPerAbsorb + s.hits * M.xpPerHit;
     if (contrib <= 0) continue; // casting into empty space earns nothing (GDD §6)

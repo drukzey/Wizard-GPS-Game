@@ -194,7 +194,7 @@ table.ctl td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
   <div class="card">
     <h1>Tomecraft</h1>
     <div class="wallet" id="wallet"></div>
-    <p>Prototype: combat (M1), collecting familiars (M2) and progression (M3). Equip any three familiars you have bound. Each one gives you one ability. Every attack goes exactly where you aim: there is no aim assist.</p>
+    <p>Prototype: combat (M1), collecting familiars (M2), progression (M3) and rifts with a boss (M4). Equip any three familiars you have bound. Each one gives you one ability. Every attack goes exactly where you aim: there is no aim assist.</p>
     <div class="tabs" role="tablist">
       <button class="tab on" data-tab="battle" role="tab">Battle</button>
       <button class="tab" data-tab="explore" role="tab">Explore<span class="dot"></span></button>
@@ -208,6 +208,8 @@ table.ctl td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
       <button class="btn alt" id="endBtn" hidden>End run</button>
       <span class="comp" id="pickT"></span>
     </div>
+    <h2>Rifts <span class="comp">fixed waves, clear bonus at the end</span></h2>
+    <div class="presets" id="rifts"></div>
     <h2>Saved loadouts</h2>
     <div class="presets" id="presets"></div>
     <h2>Controls</h2>
@@ -298,6 +300,6 @@ table.ctl td:first-child{color:var(--text);font-weight:600;white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Summoning assets…</div></div>
-<script type="module" src="game.js?v=7"></script>
+<script type="module" src="game.js?v=8"></script>
 </body>
 </html>

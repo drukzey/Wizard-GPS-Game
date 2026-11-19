@@ -1,4 +1,4 @@
-// Wizard World combat simulation (M1).
+// Wizard World combat simulation (M1, enemies and rifts M4).
 // Pure logic, no rendering: runs in the browser now and in Node (tests, future server).
 // Rule (GDD §3, LOCKED): player attacks follow the input aim vector exactly. No target lookup, no homing.
 
@@ -35,7 +35,12 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
   });
   if (slots.length !== 3) throw new Error('Loadout needs exactly 3 familiars');
 
+  // A rift (M4) is a finite list of waves plus named modifiers; without one the arena runs endless training waves.
+  const enc = opts.encounter || null;
+  const M = { speed: 1, cooldown: 1, zoneDuration: 1 };
+  for (const id of enc?.modifiers || []) { const m = cfg.riftModifiers[id]; M.speed *= m.enemySpeedMult || 1; M.cooldown *= m.cooldownMult || 1; M.zoneDuration *= m.zoneDurationMult || 1; }
   const state = {
+    won: false,
     t: 0, wave: -1, waveDelay: 1.0, over: false, nextId: 1,
     player: {
       id: 0, team: 'player', x: 0, z: 6, r: P.radius,
@@ -74,10 +79,19 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
 
   // Mastery contribution: credited to the slot whose ability actually did the work.
   const credit = (i, k, v) => { if (i >= 0 && state.slots[i]) state.slots[i].contrib[k] += v; };
-  function applyDamage(target, amount, source, slot = /^slot\d$/.test(source) ? +source[4] : -1, tick = false) {
+  // o.slot: which familiar slot gets Mastery credit; o.tick: per-frame zone damage; o.dir: travel direction of the hit (for guards).
+  function applyDamage(target, amount, source, o = {}) {
+    const slot = o.slot ?? (/^slot\d$/.test(source) ? +source[4] : -1), tick = !!o.tick;
     if (target.hp <= 0) return 0;
-    if (target.invulnT > 0) { emit({ type: 'dodged', id: target.id, x: target.x, z: target.z }); return 0; }
+    if (target.invulnT > 0) { if (!tick) emit({ type: 'dodged', id: target.id, x: target.x, z: target.z }); return 0; }
     let dmg = amount;
+    const g = target.def;
+    // Defensive guardian: hits travelling into its front arc are mostly blocked while it isn't attacking. Flank it or use area damage.
+    if (g?.guardPct && o.dir && target.mode === 'move' && target.face &&
+        -(o.dir.x * target.face.x + o.dir.z * target.face.z) > Math.cos((g.guardArcDeg * Math.PI) / 360)) {
+      const cut = (dmg * g.guardPct) / 100; dmg -= cut;
+      emit({ type: 'blocked', id: target.id, amount: cut, x: target.x, z: target.z });
+    }
     if (target.stoneT > 0) { const cut = dmg * target.stoneDr / 100; dmg -= cut; credit(target.stoneSlot ?? -1, 'absorbed', cut); }
     if (target.shield > 0) {
       const absorbed = Math.min(target.shield, dmg);
@@ -104,24 +118,23 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
     });
   }
 
+  function makeEnemy(enemyId, x, z, hpMult = 1, cd = 99) {
+    const d = cfg.enemies[enemyId], hp = d.health * hpMult;
+    return { id: state.nextId++, team: 'enemy', def: d, enemyId, x, z, r: d.radius, hp, maxHp: hp, shield: 0, invulnT: 0, stoneT: 0,
+      mode: 'move', modeT: 0, cd, lockDir: null, face: norm({ x: -x, z: -z }) || { x: 0, z: 1 }, phase: 0, ri: 0 };
+  }
+  function addEnemy(e) { resolve(e); state.enemies.push(e); emit({ type: 'spawn', id: e.id, enemyId: e.enemyId, x: e.x, z: e.z, boss: e.def.archetype === 'boss' }); return e; }
+  function edgeSpawn(enemyId, i, hpMult) {
+    const ang = rng() * Math.PI * 2;
+    return addEnemy(makeEnemy(enemyId, Math.cos(ang) * (A.halfSize - 2), Math.sin(ang) * (A.halfSize - 2) - 2, hpMult, 0.8 + i * 0.4));
+  }
+  const waveList = () => enc ? enc.waves : cfg.waves;
   function spawnWave() {
     state.wave++;
-    const list = cfg.waves[Math.min(state.wave, cfg.waves.length - 1)];
-    const extra = Math.max(0, state.wave - (cfg.waves.length - 1));
-    list.forEach((eid, i) => {
-      const d = cfg.enemies[eid];
-      const ang = rng() * Math.PI * 2;
-      const e = {
-        id: state.nextId++, team: 'enemy', def: d, enemyId: eid,
-        x: Math.cos(ang) * (A.halfSize - 2), z: Math.sin(ang) * (A.halfSize - 2) - 2,
-        r: d.radius, hp: d.health * (1 + 0.15 * extra), maxHp: d.health * (1 + 0.15 * extra),
-        shield: 0, invulnT: 0, stoneT: 0, mode: 'move', modeT: 0, cd: 0.8 + i * 0.4, lockDir: null,
-      };
-      resolve(e);
-      state.enemies.push(e);
-      emit({ type: 'spawn', id: e.id, enemyId: eid, x: e.x, z: e.z });
-    });
-    emit({ type: 'wave', wave: state.wave + 1 });
+    const W = waveList(), list = W[Math.min(state.wave, W.length - 1)];
+    const extra = enc ? 0 : Math.max(0, state.wave - (W.length - 1)); // endless training only
+    list.forEach((eid, i) => edgeSpawn(eid, i, 1 + 0.15 * extra));
+    emit({ type: 'wave', wave: state.wave + 1, of: enc ? W.length : null });
   }
 
   function playerSlowPct() {
@@ -164,7 +177,7 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
           if (d > ab.range + e.r || d < 1e-6) continue;
           const ang = Math.acos(Math.max(-1, Math.min(1, (dx * aim.x + dz * aim.z) / d)));
           if (ang > half) continue;
-          applyDamage(e, ab.damage, `slot${i}`);
+          applyDamage(e, ab.damage, `slot${i}`, { dir: aim });
           moveBy(e, (dx / d) * ab.knockback, (dz / d) * ab.knockback);
         }
         break;
@@ -206,7 +219,7 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
       p.dash.left -= step;
       for (const e of state.enemies) {
         if (!p.dash.hit.has(e.id) && Math.hypot(e.x - p.x, e.z - p.z) < e.r + p.r + p.dash.width / 2) {
-          p.dash.hit.add(e.id); applyDamage(e, p.dash.damage, 'dash', p.dash.slot);
+          p.dash.hit.add(e.id); applyDamage(e, p.dash.damage, 'dash', { slot: p.dash.slot, dir: { x: p.dash.dx, z: p.dash.dz } });
         }
       }
       if (p.dash.left <= 1e-6) p.dash = null;
@@ -250,43 +263,87 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
     p.mana = Math.min(P.mana, p.mana + P.manaRegen * dt);
   }
 
+  // Every enemy attack is one telegraphed shape; it resolves exactly as telegraphed (aim locked at windup start).
+  function attackOf(e) {
+    const d = e.def;
+    if (d.archetype === 'ranged_caster') return { shape: 'line', range: d.projectileRange, speed: d.projectileSpeed, radius: d.projectileRadius, damage: d.damage, windup: d.windup, cooldown: d.attackCooldown };
+    if (d.archetype === 'zone_controller') return { shape: 'circle', range: d.castRange, radius: d.zoneRadius, duration: d.zoneDuration, dps: d.zoneDps, windup: d.windup, cooldown: d.attackCooldown };
+    return { shape: 'arc', range: d.attackRange, arcDeg: d.arcDeg, damage: d.damage, windup: d.windup, cooldown: d.attackCooldown };
+  }
+  function inReach(e, a, dist) {
+    if (a.shape === 'arc') return dist <= a.range + e.r;
+    if (a.shape === 'ring') return dist <= a.radius + 1;
+    return dist < a.range;
+  }
+  const rot = (v, rad) => ({ x: v.x * Math.cos(rad) - v.z * Math.sin(rad), z: v.x * Math.sin(rad) + v.z * Math.cos(rad) });
+  function beginAttack(e, a, dx, dz, dist) {
+    const p = state.player;
+    e.mode = 'windup'; e.modeT = a.windup; e.atk = a; e.lockDir = { x: dx / dist, z: dz / dist }; e.lockAt = { x: p.x, z: p.z };
+    const base = { type: 'telegraph', id: e.id, time: a.windup };
+    if (a.shape === 'arc') emit({ ...base, shape: 'arc', dir: e.lockDir, range: a.range + e.r, arcDeg: a.arcDeg });
+    else if (a.shape === 'line') emit({ ...base, shape: 'line', dir: e.lockDir, range: a.range });
+    else if (a.shape === 'fan') for (const dir of fanDirs(e.lockDir, a)) emit({ ...base, shape: 'line', dir, range: a.range });
+    else if (a.shape === 'circle') emit({ ...base, shape: 'circle', x: p.x, z: p.z, radius: a.radius });
+    else if (a.shape === 'ring') emit({ ...base, shape: 'circle', x: e.x, z: e.z, radius: a.radius });
+  }
+  const fanDirs = (dir, a) => Array.from({ length: a.count }, (_, k) => rot(dir, ((-a.spreadDeg / 2 + (a.spreadDeg * k) / (a.count - 1)) * Math.PI) / 180));
+  function releaseAttack(e) {
+    const p = state.player, a = e.atk, dx = p.x - e.x, dz = p.z - e.z, dist = Math.hypot(dx, dz) || 1e-6;
+    e.mode = 'move'; e.cd = a.cooldown * M.cooldown;
+    let hit = null;
+    if (a.shape === 'arc') {
+      const ang = Math.acos(Math.max(-1, Math.min(1, (dx * e.lockDir.x + dz * e.lockDir.z) / dist)));
+      hit = dist <= a.range + e.r + p.r * 0.5 && ang <= (a.arcDeg * Math.PI) / 360;
+    } else if (a.shape === 'ring') hit = dist <= a.radius + p.r;
+    else if (a.shape === 'circle') {
+      const t = a.duration * M.zoneDuration;
+      state.zones.push({ id: state.nextId++, team: 'enemy', x: e.lockAt.x, z: e.lockAt.z, radius: a.radius, t, duration: t, dps: a.dps, slowPct: 0, source: e.enemyId });
+    } else {
+      const spec = { speed: a.speed, range: a.range, radius: a.radius, damage: a.damage };
+      for (const dir of a.shape === 'fan' ? fanDirs(e.lockDir, a) : [e.lockDir]) spawnProjectile('enemy', e.x + dir.x * 0.7, e.z + dir.z * 0.7, dir, spec, e.enemyId);
+    }
+    emit({ type: 'enemyAttack', id: e.id, hit, shape: a.shape });
+    if (hit && !state.over) applyDamage(p, a.damage, e.enemyId);
+  }
+  // Boss: health thresholds move it to the next phase (new attack rotation, summons, faster cooldowns).
+  function bossPhase(e) {
+    const ph = e.def.phases;
+    while (e.phase + 1 < ph.length && e.hp / e.maxHp <= ph[e.phase + 1].at) {
+      e.phase++; e.ri = 0; e.cd = 1.2;
+      emit({ type: 'phase', id: e.id, phase: e.phase + 1, name: ph[e.phase].name });
+      (ph[e.phase].summon || []).forEach((eid, i) => edgeSpawn(eid, i + 1, 1));
+    }
+    const P2 = ph[e.phase], list = P2.attacks;
+    e.cdMult = P2.cooldownMult || 1;
+    return list;
+  }
   function stepEnemies(dt) {
     const p = state.player;
-    for (const e of state.enemies) {
+    for (const e of [...state.enemies]) {
       const d = e.def, dx = p.x - e.x, dz = p.z - e.z, dist = Math.hypot(dx, dz) || 1e-6;
-      const sp = d.speed * (1 - enemySlowPct(e));
-      e.cd -= dt;
-      if (e.mode === 'windup') {
-        e.modeT -= dt;
-        if (e.modeT <= 0) {
-          e.mode = 'move'; e.cd = d.attackCooldown;
-          if (d.archetype === 'melee_pursuer') {
-            // Swing in the direction locked at windup start (telegraphed arc).
-            const ang = Math.acos(Math.max(-1, Math.min(1, (dx * e.lockDir.x + dz * e.lockDir.z) / dist)));
-            const hit = dist <= d.attackRange + e.r + p.r * 0.5 && ang <= (d.arcDeg * Math.PI) / 360;
-            emit({ type: 'enemyAttack', id: e.id, hit });
-            if (hit && !state.over) applyDamage(p, d.damage, e.enemyId);
-          } else {
-            spawnProjectile('enemy', e.x + e.lockDir.x * 0.7, e.z + e.lockDir.z * 0.7, e.lockDir,
-              { speed: d.projectileSpeed, range: d.projectileRange, radius: d.projectileRadius, damage: d.damage }, e.enemyId);
-            emit({ type: 'enemyAttack', id: e.id, hit: null });
-          }
-        }
-        continue;
-      }
-      if (d.archetype === 'melee_pursuer') {
-        if (dist <= d.attackRange + e.r && e.cd <= 0) {
-          e.mode = 'windup'; e.modeT = d.windup; e.lockDir = { x: dx / dist, z: dz / dist };
-          emit({ type: 'telegraph', id: e.id, shape: 'arc', dir: e.lockDir, range: d.attackRange + e.r, arcDeg: d.arcDeg, time: d.windup });
-        } else if (dist > d.attackRange * 0.8 + e.r) moveBy(e, (dx / dist) * sp * dt, (dz / dist) * sp * dt);
-      } else {
-        if (dist < d.projectileRange && e.cd <= 0) {
-          e.mode = 'windup'; e.modeT = d.windup; e.lockDir = { x: dx / dist, z: dz / dist };
-          emit({ type: 'telegraph', id: e.id, shape: 'line', dir: e.lockDir, range: d.projectileRange, time: d.windup });
-        } else if (dist > d.preferredRange + 1) moveBy(e, (dx / dist) * sp * dt, (dz / dist) * sp * dt);
-        else if (dist < d.preferredRange - 1) moveBy(e, (-dx / dist) * sp * dt, (-dz / dist) * sp * dt);
-      }
-      e.face = { x: dx / dist, z: dz / dist };
+      const sp = d.speed * M.speed * (1 - enemySlowPct(e));
+      e.cd -= dt * (e.cdMult ? 1 / e.cdMult : 1);
+      if (e.mode === 'windup') { if ((e.modeT -= dt) <= 0) releaseAttack(e); continue; }
+      let a;
+      if (d.archetype === 'boss') {
+        const list = bossPhase(e);
+        if (e.cd <= 0)
+        // Fixed rotation; skip an attack that can't reach yet so the boss never stalls.
+        for (let k = 0; k < list.length && !a; k++) { const n = list[(e.ri + k) % list.length]; if (inReach(e, d.attacks[n], dist)) { a = d.attacks[n]; e.ri = (e.ri + k + 1) % list.length; } }
+      } else a = attackOf(e);
+      if (a && e.cd <= 0 && inReach(e, a, dist)) { beginAttack(e, a, dx, dz, dist); continue; }
+      const keep = d.preferredRange;
+      if (keep) {
+        if (dist > keep + 1) moveBy(e, (dx / dist) * sp * dt, (dz / dist) * sp * dt);
+        else if (dist < keep - 1) moveBy(e, (-dx / dist) * sp * dt, (-dz / dist) * sp * dt);
+      } else if (dist > (d.attackRange || 2) * 0.8 + e.r) moveBy(e, (dx / dist) * sp * dt, (dz / dist) * sp * dt);
+      // Facing: instant for most; a guardian turns slowly so a dodge past its shield opens its back.
+      const want = { x: dx / dist, z: dz / dist };
+      if (d.turnRateDeg) {
+        const cross = e.face.x * want.z - e.face.z * want.x, dot = e.face.x * want.x + e.face.z * want.z;
+        const ang = Math.atan2(cross, dot), max = (d.turnRateDeg * Math.PI * dt) / 180;
+        e.face = rot(e.face, Math.max(-max, Math.min(max, ang)));
+      } else e.face = want;
     }
     // Keep enemies from stacking.
     for (let i = 0; i < state.enemies.length; i++) for (let j = i + 1; j < state.enemies.length; j++) {
@@ -309,7 +366,7 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
           if (t.hp <= 0 || pr.hit.has(t.id)) continue;
           if (Math.hypot(t.x - pr.x, t.z - pr.z) < t.r + pr.r) {
             pr.hit.add(t.id);
-            applyDamage(t, pr.damage, pr.source);
+            applyDamage(t, pr.damage, pr.source, { dir: { x: pr.dx, z: pr.dz } });
             if (!pr.pierce) { alive = false; emit({ type: 'projectileEnd', id: pr.id, x: pr.x, z: pr.z, team: pr.team }); break; }
           }
         }
@@ -321,8 +378,12 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
 
   function stepZones(dt) {
     state.zones = state.zones.filter((z) => (z.t -= dt) > 0);
-    for (const z of state.zones) if (z.dps > 0) for (const e of state.enemies)
-      if (Math.hypot(e.x - z.x, e.z - z.z) < z.radius + e.r) applyDamage(e, z.dps * dt, 'zone', z.slot, true);
+    const p = state.player;
+    for (const z of state.zones) {
+      if (z.team === 'enemy') { if (z.dps > 0 && !state.over && Math.hypot(p.x - z.x, p.z - z.z) < z.radius + p.r) applyDamage(p, z.dps * dt, z.source, { tick: true }); continue; }
+      if (z.dps > 0) for (const e of state.enemies)
+        if (Math.hypot(e.x - z.x, e.z - z.z) < z.radius + e.r) applyDamage(e, z.dps * dt, 'zone', { slot: z.slot, tick: true });
+    }
   }
 
   function step(input = {}, dt = 1 / 60) {
@@ -333,7 +394,10 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
     stepProjectiles(dt);
     stepZones(dt);
     state.enemies = state.enemies.filter((e) => e.hp > 0);
-    if (opts.waves !== false && state.enemies.length === 0 && !state.over && (state.waveDelay -= dt) <= 0) { spawnWave(); state.waveDelay = 2.5; }
+    if (opts.waves !== false && state.enemies.length === 0 && !state.over) {
+      if (enc && state.wave >= enc.waves.length - 1) { state.over = true; state.won = true; emit({ type: 'victory' }); }
+      else if ((state.waveDelay -= dt) <= 0) { spawnWave(); state.waveDelay = 2.5; }
+    }
     return state;
   }
 
@@ -341,9 +405,7 @@ export function createSim(cfg, loadout = cfg.defaultLoadout, seed = 1, opts = {}
 
   // Test/dev helpers (not used by gameplay code).
   function debugSpawn(enemyId, x, z) {
-    const d = cfg.enemies[enemyId];
-    const e = { id: state.nextId++, team: 'enemy', def: d, enemyId, x, z, r: d.radius, hp: d.health, maxHp: d.health, shield: 0, invulnT: 0, stoneT: 0, mode: 'move', modeT: 0, cd: 99, lockDir: null };
-    state.enemies.push(e); return e;
+    const e = makeEnemy(enemyId, x, z); state.enemies.push(e); return e;
   }
 
   return { state, step, drainEvents, debugSpawn, applyDamage, spawnProjectile };
