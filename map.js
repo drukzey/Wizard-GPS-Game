@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=39';
-import * as Col from './collection.js?v=39';
+import * as World from './world.js?v=40';
+import * as Col from './collection.js?v=40';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -274,7 +274,7 @@ async function plantTrees() {
   const green = (p) => { const q = st.map.project([p.lon, p.lat]); if (q.x < 0 || q.y < 0 || q.x > cv.clientWidth || q.y > cv.clientHeight) return null;
     const f = st.map.queryRenderedFeatures([q.x, q.y]); if (f.some((x) => /water|building|road|street|path|rail/.test(x.layer.id))) return null;
     const g = f.find((x) => x.layer.type === 'fill' && /park|wood|forest|grass|scrub|cemetery|garden|meadow/.test(x.layer.id)); return g ? (/wood|forest/.test(g.layer.id) ? 'wood' : 'park') : null; };
-  const clear = (p) => [...(st.shrineSites || []), ...(st.sites || [])].every((s) => World.distanceM(s, p) > 16);
+  const clear = (p) => World.distanceM(st.pos, p) > 14 && [...(st.shrineSites || []), ...(st.sites || []), ...(st.spawns || [])].every((s) => World.distanceM(s, p) > (s.familiarId ? 8 : 16)); // never on the wizard, a familiar, a shrine or a portal
   for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) {
     const key = `${c.cx + dx}:${c.cy + dy}`; if (trees.cells.has(key)) continue;
     const lat0 = (c.cy + dy) * c.latStep, lon0 = (c.cx + dx) * c.lonStep, mid = st.map.project([lon0 + c.lonStep / 2, lat0 + c.latStep / 2]);
