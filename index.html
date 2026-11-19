@@ -90,7 +90,7 @@ body.lefty .abilities{right:auto;left:12px;flex-direction:row-reverse} body.left
 .lochelp{position:absolute;left:50%;top:70px;transform:translateX(-50%);width:min(460px,92vw);background:#0b0f10f2;border:1px solid #d9b46a;border-radius:6px;padding:14px 16px;z-index:2}
 .lochelp>b{font:800 16px Grenze,serif;color:var(--gold)}.lochelp p{color:var(--text);font-size:14px}
 .lochelp[hidden],.locgps[hidden]{display:none}
-.locgps{position:absolute;right:10px;bottom:70px}
+.locgps{position:absolute;right:10px}
 .wbar{position:absolute;top:10px;left:10px;right:10px;display:flex;gap:8px;align-items:center;justify-content:space-between;font:700 13px 'Alegreya Sans',sans-serif;pointer-events:none}
 .wbar>*{pointer-events:auto}
 #worldStatus{background:#000c;border:1px solid #d9b46a66;padding:7px 12px;border-radius:4px}
@@ -345,7 +345,7 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .hit.near em,.hit:hover em,.hit:focus-visible em{display:block}
 .hit:focus-visible{outline:2px solid var(--brass)}
 .wmsg{position:absolute;top:70px;left:50%;transform:translateX(-50%);max-width:92vw;background:#0b0f0ee6;border:1px solid #3b4245;padding:9px 14px;font:600 14px var(--body);text-align:center}
-.locgps{position:absolute;top:calc(64px + env(safe-area-inset-top));right:12px;cursor:pointer}
+.locgps{position:absolute;top:calc(106px + env(safe-area-inset-top));right:12px;cursor:pointer}
 .lochelp{position:absolute;left:50%;top:80px;transform:translateX(-50%);width:min(460px,92vw);z-index:2}
 .lochelp>b{font:700 20px var(--display)}
 /* Tome menu */
@@ -427,9 +427,9 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 @media (max-width:600px){.tile{min-height:150px;padding:28px 8px 14px}.tile b{font-size:18px}.tile small{font-size:12px}}
 /* loading: static paths, since the sprite variables are not ready yet */
 #loading{background:radial-gradient(ellipse at 50% 40%,#2a2342,#0b0a14 72%)}
-#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=23') center/contain no-repeat;opacity:.9}
+#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=24') center/contain no-repeat;opacity:.9}
 #loading h1{font-size:56px;text-shadow:0 3px 12px #000,0 0 30px #7b5cd666}
-#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=23') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
+#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=24') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
 #loading .lb i{background:linear-gradient(90deg,#b8862e,#f2cf86)}
 #loadT{font:600 15px var(--body);color:#c9bfa8}
 
@@ -638,6 +638,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=23"></script>
+<script type="module" src="game.js?v=24"></script>
 </body>
 </html>
