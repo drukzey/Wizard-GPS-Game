@@ -1,7 +1,7 @@
 // Tomecraft world map (M6 alpha): MapLibre + OpenFreeMap vector tiles, phone GPS, familiar markers.
 // Location never leaves the device. Needs the hosted site: Claude artifact pages block location and map tiles.
-import * as World from './world.js?v=11';
-import * as Col from './collection.js?v=11';
+import * as World from './world.js?v=12';
+import * as Col from './collection.js?v=12';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';

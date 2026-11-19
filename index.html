@@ -63,6 +63,10 @@ canvas{display:block;position:fixed;inset:0;width:100%;height:100%}
 .dodgeBtn{position:absolute;pointer-events:auto;right:22px;bottom:112px;width:68px;height:68px;border:0;background:var(--u-ring) center/contain no-repeat;color:var(--text);touch-action:none;display:flex;flex-direction:column;align-items:center;justify-content:center;font:800 8px 'Alegreya Sans',sans-serif;letter-spacing:1px}
 .dodgeBtn .ico{width:24px;height:24px;margin-bottom:1px}
 .stick{position:absolute;width:118px;height:118px;margin:-59px 0 0 -59px;background:var(--u-ring) center/contain no-repeat;opacity:.75;display:none}
+.stick i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;background:radial-gradient(#d9b46a,#6d5530);box-shadow:0 0 10px #000}
+.hint{position:absolute;bottom:14px;left:14px;font:600 11px 'Alegreya Sans',sans-serif;color:var(--dim);max-width:46vw;line-height:1.5;text-shadow:0 1px 2px #000}
+body.touch .hint{display:none} body:not(.touch) .dodgeBtn{display:none}
+body.lefty .abilities{right:auto;left:12px;flex-direction:row-reverse} body.lefty .dodgeBtn{right:auto;left:22px}
 .overlay{position:fixed;inset:0;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 14px;pointer-events:auto;touch-action:pan-y}
 .overlay[hidden]{display:none}
 .bindWrap{display:flex;flex-direction:column;align-items:center;gap:6px;margin-top:2vh;text-align:center}
@@ -448,6 +452,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=11"></script>
+<script type="module" src="game.js?v=12"></script>
 </body>
 </html>
