@@ -110,18 +110,19 @@ export class Animator {
 
     }
     this.cur = null; this.oneShot = null; this.loco = {};
+    this.alias = {}; // per-character clip swaps, e.g. the wizard's staff versions of idle, walk and cast
   }
 
   setLoco(weights, timeScale = 1) {
     // weights: {name: w}; locomotion clips loop and are blended by weight
-    for (const [n, w] of Object.entries(weights)) {
-      const a = this.actions[n]; if (!a) continue;
+    for (let [n, w] of Object.entries(weights)) {
+      n = this.alias[n] || n; const a = this.actions[n]; if (!a) continue;
       if (!a.isRunning()) { a.setLoop(THREE.LoopRepeat); a.play(); }
       this.loco[n] = w; a.timeScale = timeScale;
     }
   }
   playOnce(name, duration, onDone) {
-    const a = this.actions[name]; if (!a) return;
+    name = this.alias[name] || name; const a = this.actions[name]; if (!a) return;
     if (this.oneShot && this.oneShot.a !== a) this.oneShot.a.stop();
     a.reset(); a.setLoop(THREE.LoopOnce); a.clampWhenFinished = true;
     a.timeScale = duration ? a.getClip().duration / duration : 1;

@@ -52,7 +52,7 @@ export function buildHub() {
 const findBone = (root, re) => { let b = null; root.traverse((o) => { if (!b && o.isBone && re.test(o.name)) b = o; }); return b; };
 
 // How a staff sits in the old Synty rig's right hand (tuned by eye; the hand's local X runs along the fingers).
-export const staffTune = { len: 1.75, rx: -1, ry: 0.5, rz: -Math.PI / 2, grip: 0.47, ox: 0, oy: 0, oz: 0, curl: 1.1 };
+export const staffTune = { len: 1.75, rx: -3.1, ry: -0.13, rz: 2.68, grip: 0.53, ox: 0, oy: 0, oz: 0, curl: 1.1 };
 /** Close the hand around the shaft: the animations don't drive finger bones, so they keep this pose. */
 function curlFingers(hand, amount) {
   hand.traverse((b) => { if (!b.isBone || b === hand) return;
@@ -130,26 +130,15 @@ export function buildHome(cfg) {
   const s = home.scene = new THREE.Scene();
   s.background = new THREE.Color(0x1a2124); s.fog = new THREE.Fog(0x1a2124, 60, 160);
   const key = makeLights(s, 0xffe2b8, 0x9fd4ff);
-  Object.assign(key.shadow.camera, { left: -20, right: 20, top: 20, bottom: -20, far: 80 }); key.position.set(12, 24, 10);
+  Object.assign(key.shadow.camera, { left: -40, right: 40, top: 40, bottom: -40, far: 140 }); key.shadow.mapSize.set(2048, 2048); key.position.set(24, 48, 20);
   home.cam = new THREE.PerspectiveCamera(36, 1, 0.5, 200);
   const S = cfg.sanctuary, size = S.grid * S.tile;
   home.root = new THREE.Group(); s.add(home.root);
   // A floating island above the clouds: grass top, a jagged rock underside, mist below and a dusk sky.
   s.background = skyTexture(); s.fog = new THREE.Fog(0x2b2440, 70, 170);
-  const R = size * 0.78;
-  const top = new THREE.Mesh(new THREE.CircleGeometry(R, 56), new THREE.MeshLambertMaterial({ color: 0x4f6b3e }));
-  top.rotation.x = -Math.PI / 2; top.receiveShadow = true; s.add(top);
-  const rim = new THREE.Mesh(new THREE.CylinderGeometry(R, R * 0.97, 1.4, 56, 1, true), new THREE.MeshLambertMaterial({ color: 0x5b4a38, side: THREE.DoubleSide }));
-  rim.position.y = -0.7; s.add(rim);
-  const under = new THREE.ConeGeometry(R * 0.97, R * 1.1, 28, 6);
-  const pa = under.attributes.position; for (let i = 0; i < pa.count; i++) { const y = pa.getY(i); if (y < R * 0.5) { const f = 1 + (Math.sin(i * 12.9898) * 43758.5453 % 1) * 0.18; pa.setX(i, pa.getX(i) * f); pa.setZ(i, pa.getZ(i) * f); } }
-  under.computeVertexNormals();
-  const rock = new THREE.Mesh(under, new THREE.MeshLambertMaterial({ color: 0x4a4250, flatShading: true }));
-  rock.rotation.x = Math.PI; rock.position.y = -1.4 - R * 0.55; s.add(rock);
+  const R = 34; // the island itself (terrain, cliffs, pond, woods, observatory) is authored in Blender: blender/build_island.py
   home.ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), new THREE.MeshBasicMaterial({ visible: false })); // the buildable plot, for picking
   home.ground.rotation.x = -Math.PI / 2; s.add(home.ground);
-  const paths = new THREE.Group(); s.add(paths); // stone paths crossing the plot between the four buildings
-  for (const [w, d] of [[size * 0.9, 2.6], [2.6, size * 0.9]]) { const m = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshLambertMaterial({ color: 0x8a7e6a })); m.rotation.x = -Math.PI / 2; m.position.y = 0.02; m.receiveShadow = true; paths.add(m); }
   const mist = new THREE.Group(); s.add(mist); home.mist = mist; // drifting cloud puffs below the island
   const puff = cloudTexture();
   for (let i = 0; i < 26; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: puff, color: 0xc9b8e8, transparent: true, opacity: 0.55, depthWrite: false }));
@@ -175,23 +164,23 @@ function cloudTexture() {
     g.addColorStop(0, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 128, 128); }
   return new THREE.CanvasTexture(c);
 }
-/** Trees, rocks and bushes around the island's edge, outside the buildable grid (Fantasy Kingdom models). */
-export async function dressIsland(cfg) {
+/** Load the Blender-built island once: vertex-coloured terrain and rock, a pond, and Synty Kingdom set dressing. */
+export async function dressIsland() {
   if (home.dressed) return; home.dressed = true;
-  const R = home.R, place = async (name, n, r0, r1, h0, h1) => {
-    for (let i = 0; i < n; i++) {
-      const m = await D.loadModel(name, true); if (!m) return;
-      const a = (i / n) * Math.PI * 2 + Math.random() * 0.3, r = r0 + Math.random() * (r1 - r0);
-      const b = new THREE.Box3().setFromObject(m), k = (h0 + Math.random() * (h1 - h0)) / Math.max(1e-3, b.max.y - b.min.y);
-      m.scale.setScalar(k); m.position.set(Math.cos(a) * r, -b.min.y * k, Math.sin(a) * r); m.rotation.y = Math.random() * 6.28;
-      m.traverse((o) => { if (o.isMesh) o.castShadow = true; }); home.scenery.add(m);
-    }
-  };
-  await place('pines', 9, R * 0.86, R * 0.95, 8, 12);
-  await place('tree', 7, R * 0.8, R * 0.92, 5, 7);
-  await place('rock1', 6, R * 0.9, R * 0.98, 1.2, 2.2);
-  await place('bush1', 10, R * 0.78, R * 0.95, 1, 1.6);
-  await place('df_brazier', 4, R * 0.74, R * 0.76, 2.2, 2.2);
+  const isl = await D.loadModel('island', true); if (!isl) return;
+  const water = new THREE.MeshLambertMaterial({ color: 0x2a7a96, emissive: 0x0b3344, transparent: true, opacity: 0.85 });
+  const ground = new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true });
+  isl.traverse((o) => {
+    if (!o.isMesh) return;
+    if (/water/i.test(o.name)) { o.material = water; o.receiveShadow = true; o.castShadow = false; home.water = o; }
+    else if (o.geometry.attributes.color) { o.material = ground; o.castShadow = !/terrain/i.test(o.name); o.receiveShadow = true; }
+  });
+  // FBX units and axes: scale to the authored 68 m terrain width and stand it on the plot
+  isl.updateMatrixWorld(true);
+  let ter = null; isl.traverse((o) => { if (o.isMesh && /terrain/i.test(o.name)) ter = o; });
+  const tb = new THREE.Box3().setFromObject(ter || isl), w = tb.max.x - tb.min.x;
+  isl.scale.multiplyScalar(68.9 / Math.max(1e-3, w)); isl.updateMatrixWorld(true);
+  home.scenery.add(isl); home.island = isl;
 }
 export const tileCenter = (cfg, x, z) => { const S = cfg.sanctuary, o = -S.grid * S.tile / 2 + S.tile / 2; return new THREE.Vector3(o + x * S.tile, 0, o + z * S.tile); };
 
@@ -205,7 +194,7 @@ function fit(obj, maxSide, sink = 0) { // scale a building to fit its footprint,
 }
 /** Rebuild whatever changed since the last call (facility levels, decor list). */
 export async function syncHome(cfg, h) {
-  const S = cfg.sanctuary; dressIsland(cfg);
+  const S = cfg.sanctuary; dressIsland();
   for (const [id, f] of Object.entries(S.facilities)) {
     const model = f.models[h.facilities[id] - 1];
     if (home.facilities[id]?.userData.model === model) continue;

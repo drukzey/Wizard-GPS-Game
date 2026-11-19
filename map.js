@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=26';
-import * as Col from './collection.js?v=26';
+import * as World from './world.js?v=27';
+import * as Col from './collection.js?v=27';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -384,7 +384,14 @@ function tapSpawn(s) {
   const enc = Col.registerWorldEncounter(col, World.toEncounter(H.cfg, s, Date.now()));
   if (!enc) { H.toast('That familiar has gone.'); scan(true); return; }
   H.saveCol();
-  H.openBinding(enc.id, 'map');
+  channelAt(s, () => H.openBinding(enc.id, 'map'));
+}
+/** The wizard turns to the target and channels (custom Blender clip) before the next screen opens. */
+function channelAt(p, then) {
+  const an = g3.wizard?.userData.anim;
+  if (!an || !an.actions.channel) return then();
+  const l = local(p); st.heading = Math.atan2(l.x, l.z);
+  an.playOnce('channel', 0.9); setTimeout(then, 700);
 }
 function tapRift(site) {
   const rift = H.cfg.rifts.find((r) => r.id === site.riftId);
@@ -393,7 +400,7 @@ function tapRift(site) {
 const shrineInRange = (s) => World.distanceM(st.pos, s) - Math.min(st.acc, H.cfg.world.accuracyAllowanceM) <= H.cfg.shrines.radiusM;
 function tapShrine(s) {
   if (st.tooFast) return H.toast('You are moving too fast. Interactions pause above walking or jogging pace.');
-  H.visitShrine(s, shrineInRange(s) ? null : Math.round(World.distanceM(st.pos, s)));
+  if (shrineInRange(s)) channelAt(s, () => H.visitShrine(s, null)); else H.visitShrine(s, Math.round(World.distanceM(st.pos, s)));
 }
 /** Points of interest the map has loaded (shops, cafes, monuments...), for shrines to stand on. */
 function pois() {

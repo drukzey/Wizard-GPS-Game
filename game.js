@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=26';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=26';
-import * as Col from './collection.js?v=26';
-import * as P from './progression.js?v=26';
-import * as S from './sanctuary.js?v=26';
-import * as Stage from './stage.js?v=26';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=26';
-import * as World from './world.js?v=26';
+import { createSim } from './sim.js?v=27';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=27';
+import * as Col from './collection.js?v=27';
+import * as P from './progression.js?v=27';
+import * as S from './sanctuary.js?v=27';
+import * as Stage from './stage.js?v=27';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=27';
+import * as World from './world.js?v=27';
 
 const $ = (id) => document.getElementById(id);
-const VER = 26; // cache-busting version, kept in step by stamp.py
+const VER = 27; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -121,7 +121,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=26`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=27`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -130,7 +130,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=26')).default, ...(await import('./pub/anims_m5.js?v=26')).default, ...(await import('./pub/anims_custom.js?v=26')).default };
+    const packed = { ...(await import('./pub/anims.js?v=27')).default, ...(await import('./pub/anims_m5.js?v=27')).default, ...(await import('./pub/anims_custom.js?v=27')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -139,7 +139,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=26')).default, ...(await import('./pub/models_m4.js?v=26')).default };
+  const models = { ...(await import('./pub/models.js?v=27')).default, ...(await import('./pub/models_m4.js?v=27')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -161,7 +161,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=26')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=27')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       const df = name.startsWith('df_'); // Dark Fantasy pieces use their own atlas, and their fire and runes glow
@@ -182,7 +182,10 @@ function instance(key) {
   if (assets.lib && MODELS[key][1] && hasBones) {
     try {
       const an = new Animator(assets.lib, g.children[0]);
-      if (an.ok) { g.userData.anim = an; an.setLoco({ idle: 1 }); an.update(0); }
+      if (an.ok) {
+        if (key === 'mage') an.alias = Object.fromEntries(Object.entries({ idle: 'staffIdle', walk: 'staffWalk', cast: 'staffCast' }).filter(([, c]) => assets.lib.clips[c])); // custom Blender clips: the wizard always holds the staff
+        g.userData.anim = an; an.setLoco({ idle: 1 }); an.update(0);
+      }
       else console.warn(`[anim] ${key}: only ${an.pairs.length} bones matched`);
     } catch (err) { console.warn(`[anim] ${key} retarget failed`, err); }
   }
@@ -762,7 +765,7 @@ $('menuBtn').onclick = () => toggleMenu(true, 'battle');
 $('setClose').onclick = () => { $('settingsOv').hidden = true; };
 $('tomeBtn').onclick = () => { $('tomeMenu').hidden = false; $('nearbyPanel').hidden = true; renderPurse('tmPurse'); renderTomeTiles(); };
 $('tomeClose').onclick = () => { $('tomeMenu').hidden = true; };
-for (const t of document.querySelectorAll('#tomeMenu .tile')) t.onclick = () => {
+for (const t of document.querySelectorAll('#tomeMenu [data-go]')) t.onclick = () => {
   if (t.dataset.go === 'settings') { $('settingsOv').hidden = false; return; }
   toggleMenu(true, t.dataset.go);
 };
@@ -1488,7 +1491,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=26')).json();
+    cfg = await (await fetch('data/config.json?v=27')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));

@@ -427,9 +427,9 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 @media (max-width:600px){.tile{min-height:150px;padding:28px 8px 14px}.tile b{font-size:18px}.tile small{font-size:12px}}
 /* loading: static paths, since the sprite variables are not ready yet */
 #loading{background:radial-gradient(ellipse at 50% 40%,#2a2342,#0b0a14 72%)}
-#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=26') center/contain no-repeat;opacity:.9}
+#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=27') center/contain no-repeat;opacity:.9}
 #loading h1{font-size:56px;text-shadow:0 3px 12px #000,0 0 30px #7b5cd666}
-#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=26') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
+#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=27') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
 #loading .lb i{background:linear-gradient(90deg,#b8862e,#f2cf86)}
 #loadT{font:600 15px var(--body);color:#c9bfa8}
 
@@ -461,6 +461,20 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .lochelp{top:150px}
 .nearbyBtn{gap:0;padding-top:2px;padding-bottom:2px}.nearbyBtn .scLabel b{font-size:16px}
 .sideCard{height:100px}
+
+/* Tome: four main destinations as arches, two quiet ones below */
+.tmTitle{font:700 30px var(--display);color:var(--bone);margin:0 0 4px;text-shadow:0 2px 10px #000}
+.tmGrid{grid-template-columns:repeat(2,minmax(0,168px));gap:14px 18px}
+.tile{min-height:0;aspect-ratio:1/1.08;padding:26% 10px 15%;justify-content:flex-end;gap:10px}
+.tile .sprite{width:44%;height:auto;aspect-ratio:1;margin-bottom:auto;margin-top:6%}
+.tile b{font-size:20px;line-height:1}
+.tile small{display:none}
+.tileFace{width:52%;aspect-ratio:1;border-radius:50%;object-fit:cover;margin-top:6%;margin-bottom:auto;box-shadow:0 0 0 2px #d7b26b88}
+.tmMinor{display:flex;gap:28px;justify-content:center;margin-top:6px}
+.tmMini{display:flex;flex-direction:column;align-items:center;gap:4px;background:none;border:0;cursor:pointer;color:var(--ash);font:600 13px var(--body)}
+.miniRing{width:54px;height:54px;display:flex;align-items:center;justify-content:center;background:var(--u-f_ring) center/contain no-repeat,radial-gradient(circle,#1d2426 55%,transparent 57%)}.miniRing .sprite{width:24px;height:24px}
+.tmMini:hover{color:var(--bone)}
+@media (max-width:600px){.tmGrid{grid-template-columns:repeat(2,minmax(0,1fr));width:min(100%,360px)}.tile{min-height:0}.tile .sprite{width:44%;height:auto}}
 </style>
 </head>
 <body>
@@ -515,13 +529,16 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 
 <div class="tomeMenu" id="tomeMenu" hidden>
   <div class="tmHead"><div class="purse" id="tmPurse"></div></div>
+  <h2 class="tmTitle">The Tome</h2>
   <div class="tmGrid">
-    <button class="tile" data-go="battle"><span class="sprite" style="--m:var(--u-n_play)"></span><b>Battle</b><small>Rifts and training</small></button>
-    <button class="tile" data-go="familiars"><span class="sprite" style="--m:var(--u-n_chamber)"></span><b>Familiars</b><small>Your team</small></button>
-    <button class="tile" data-go="wizard"><span class="sprite" style="--m:var(--u-n_wizard)"></span><b>Wizard</b><small>Gear and bag</small></button>
-    <button class="tile" data-go="home"><span class="sprite" style="--m:var(--u-n_home)"></span><b>Sanctuary</b><small>Your home</small></button>
-    <button class="tile" data-go="journal"><span class="sprite" style="--m:var(--u-n_scroll)"></span><b>Journal</b><small>Collection and research</small></button>
-    <button class="tile" data-go="settings"><span class="sprite" style="--m:var(--u-n_settings)"></span><b>Settings</b><small>Motion, sound, controls</small></button>
+    <button class="tile" data-go="battle"><span class="sprite" style="--m:var(--u-n_play)"></span><b>Battle</b></button>
+    <button class="tile" data-go="familiars"><span class="sprite" style="--m:var(--u-n_chamber)"></span><b>Familiars</b></button>
+    <button class="tile" data-go="wizard"><span class="sprite" style="--m:var(--u-n_wizard)"></span><b>Wizard</b></button>
+    <button class="tile" data-go="home"><span class="sprite" style="--m:var(--u-n_home)"></span><b>Sanctuary</b></button>
+  </div>
+  <div class="tmMinor">
+    <button class="tmMini" data-go="journal"><span class="miniRing"><span class="sprite" style="--m:var(--u-n_scroll)"></span></span><small>Journal</small></button>
+    <button class="tmMini" data-go="settings"><span class="miniRing"><span class="sprite" style="--m:var(--u-n_settings)"></span></span><small>Settings</small></button>
   </div>
   <button class="closeX" id="tomeClose" aria-label="Close the Tome">✕</button>
 </div>
@@ -638,6 +655,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=26"></script>
+<script type="module" src="game.js?v=27"></script>
 </body>
 </html>
