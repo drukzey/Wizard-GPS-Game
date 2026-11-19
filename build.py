@@ -136,6 +136,9 @@ if __name__ == '__main__' and sys.argv[1:] == ['m6']:  # map scenery, island and
     for k, (p, m) in UI_M6.items():
         im = Image.open(p).convert('RGBA'); im.thumbnail((m, m), Image.LANCZOS); im.save(os.path.join(ui, f'{k}.png'), optimize=True)
     print('ui m6', len(UI_M6))
+elif __name__ == '__main__' and sys.argv[1:] == ['anims']:  # custom Blender clips: python3 -I build.py anims (after blender/make_anims.py)
+    B = f'{UP}/_tomecraft_blender/out'
+    print('anims_custom.js', pack({k: f'{B}/{k}.fbx' for k in ['staffIdle', 'staffWalk', 'staffCast', 'channel', 'idleRT']}, 'anims_custom.js'))
 elif __name__ == '__main__' and sys.argv[1:] == ['m5']:  # M5 only: python3 -I build.py m5
     os.makedirs(os.path.join(OUT, 'sanct'), exist_ok=True)  # one file per model so the Sanctuary loads only what it shows
     print('sanct/*', sum(pack({k: v}, f'sanct/{k}.js') for k, v in MODELS_SANCTUARY.items()))
