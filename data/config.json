@@ -456,9 +456,9 @@
     "maxSpeedMps": 7,
     "viewRadiusM": 450,
     "demoStart": {
-      "lat": 51.5079,
-      "lon": -0.0877
+      "lat": 51.5027,
+      "lon": -0.1337
     },
-    "demoWalkMps": 1.6
+    "demoWalkMps": 6
   }
 }

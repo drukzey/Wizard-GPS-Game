@@ -18,7 +18,7 @@ export function initWorld(hooks) {
   H = hooks;
   $('worldBack').onclick = closeWorld;
   $('safetyOk').onclick = () => { st.safetyOk = true; $('safety').hidden = true; startLocation(); };
-  $('demoBtn').onclick = () => startDemo('You chose demo mode.');
+  $('demoBtn').onclick = () => { st.safetyOk = true; $('safety').hidden = true; startDemo('You chose demo mode.'); };
   $('recenter').onclick = () => st.pos && st.map && st.map.easeTo({ center: [st.pos.lon, st.pos.lat], zoom: 17.3 });
 }
 
