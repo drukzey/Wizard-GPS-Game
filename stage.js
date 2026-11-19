@@ -202,7 +202,7 @@ export function renderHome(renderer, dt, layout) {
   c.aspect = w / h;
   const portrait = w < h, free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
   c.fov = portrait ? 50 : 36;
-  const dist = home.dist * Math.min(2, 1 / Math.max(0.4, free)) * (portrait ? 1.7 : 1), cp = Math.cos(home.pitch);
+  const dist = home.dist * Math.min(2, 1 / Math.max(0.4, free)) * (portrait ? 1.15 : 1), cp = Math.cos(home.pitch);
   c.position.set(home.target.x + Math.sin(home.yaw) * cp * dist, Math.sin(home.pitch) * dist, home.target.z + Math.cos(home.yaw) * cp * dist);
   c.lookAt(home.target);
   c.clearViewOffset();
