@@ -369,7 +369,10 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .pick{padding:10px 12px}.jc .famIco.pic{width:64px;height:64px}
 .tileFace{width:70px;height:70px;border-radius:50%;object-fit:cover;background:radial-gradient(circle at 50% 35%,#3a4a46,#0d1112);box-shadow:0 0 0 2px #000,0 0 0 3px var(--brass)}
 @media (max-width:600px){.nearbyBtn{min-width:0;width:96px;padding:4px 6px}.nearFaces img{width:24px;height:24px}.avatarBtn{transform:scale(.9);transform-origin:left bottom}}
-.maplibregl-ctrl-top-left{top:max(6px,env(safe-area-inset-top))!important}.maplibregl-ctrl-attrib{background:#0b0f0ecc!important;color:#9aa39e}.maplibregl-ctrl-attrib a{color:#c9b98f!important}
+.maplibregl-ctrl-bottom-right{bottom:calc(112px + env(safe-area-inset-bottom))!important}.maplibregl-ctrl-attrib{background:#0b0f0ecc!important;color:#9aa39e}.maplibregl-ctrl-attrib a{color:#c9b98f!important}
+.riftArt{flex:none;width:84px;height:104px;align-self:stretch;background:radial-gradient(ellipse at 50% 80%,#3a2620,#121010 70%);box-shadow:inset 0 0 0 1px #3b4245;overflow:hidden;display:flex;align-items:flex-end;justify-content:center}
+.riftArt img{width:130%;height:auto;margin-bottom:-6px}.riftArt.boss{background:radial-gradient(ellipse at 50% 80%,#6a1d16,#160b09 70%);box-shadow:inset 0 0 0 1px #c8463a}
+@media (max-width:600px){.riftArt{width:70px}}
 </style>
 </head>
 <body>
@@ -542,6 +545,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=18"></script>
+<script type="module" src="game.js?v=19"></script>
 </body>
 </html>

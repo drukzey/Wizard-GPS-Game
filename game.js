@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=18';
-import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=18';
-import * as Col from './collection.js?v=18';
-import * as P from './progression.js?v=18';
-import * as S from './sanctuary.js?v=18';
-import * as Stage from './stage.js?v=18';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=18';
-import * as World from './world.js?v=18';
+import { createSim } from './sim.js?v=19';
+import { Animator, makeLibrary, gunzipB64 } from './anim.js?v=19';
+import * as Col from './collection.js?v=19';
+import * as P from './progression.js?v=19';
+import * as S from './sanctuary.js?v=19';
+import * as Stage from './stage.js?v=19';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=19';
+import * as World from './world.js?v=19';
 
 const $ = (id) => document.getElementById(id);
-const VER = 18; // cache-busting version, kept in step by stamp.py
+const VER = 19; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -120,7 +120,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=18`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=19`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -129,7 +129,7 @@ async function loadAll() {
   tick('Textures');
   try {
     if (typeof DecompressionStream === 'undefined') throw new Error('This browser cannot unpack animations');
-    const packed = { ...(await import('./pub/anims.js?v=18')).default, ...(await import('./pub/anims_m5.js?v=18')).default };
+    const packed = { ...(await import('./pub/anims.js?v=19')).default, ...(await import('./pub/anims_m5.js?v=19')).default };
     const objs = {};
     for (const [k, b64] of Object.entries(packed)) objs[k] = fbx.parse(await gunzipB64(b64), '');
     // The skeleton inside an animation file is the source rig, so clips and rest pose share one root orientation.
@@ -138,7 +138,7 @@ async function loadAll() {
     console.info('[anim] clips', Object.entries(assets.lib.clips).map(([n, c]) => `${n} ${c.duration.toFixed(2)}s/${c.tracks.length}tr`).join(', '));
   } catch (err) { console.warn('[anim] animations unavailable, using procedural motion', err); assets.lib = null; }
   tick('Animations');
-  const models = { ...(await import('./pub/models.js?v=18')).default, ...(await import('./pub/models_m4.js?v=18')).default };
+  const models = { ...(await import('./pub/models.js?v=19')).default, ...(await import('./pub/models_m4.js?v=19')).default };
   for (const [k, [atl, h]] of Object.entries(MODELS)) {
     try {
       const obj = fbx.parse(await gunzipB64(models[k]), '');
@@ -160,7 +160,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=18')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=19')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       obj.traverse((o) => { if (o.isMesh) { o.material = new THREE.MeshLambertMaterial({ map: assets.atlas.kingdom }); o.castShadow = o.receiveShadow = true; } });
@@ -205,6 +205,7 @@ function makePortraits() {
   };
   for (const [fid, f] of Object.entries(cfg.familiars)) portraits[fid] = shot(f.model, false);
   portraits.mage = shot('mage', true);
+  for (const [eid, e] of Object.entries(cfg.enemies)) portraits[eid] = shot(e.model, false);
   r.dispose();
 }
 /** Round portrait with the ability glyph as a small badge, so identity is the creature and the ability stays readable. */
@@ -716,7 +717,7 @@ function showTab(tab) {
   $('homeLabels').hidden = tab !== 'home';
   if (tab !== 'home') { placing = null; selDecor = null; Stage.setGhost(cfg, null); }
   ({ battle: renderPlay, familiars: renderTeam, wizard: renderWizard, home: renderHome, journal: renderJournal })[tab]();
-  if (tab === 'familiars') Stage.setHubLoadout(loadout, weaponModel());
+  if (tab === 'familiars' || tab === 'wizard') { Stage.setHubLoadout(loadout, weaponModel()).then(() => Stage.setHubFocus(tab === 'wizard' ? 'wizard' : 'team')); Stage.setHubFocus(tab === 'wizard' ? 'wizard' : 'team'); }
   $('sheet').scrollTop = 0;
   updateBase();
 }
@@ -806,7 +807,8 @@ function renderRifts() {
   for (const r of cfg.rifts) {
     const locked = lvl < r.minLevel, done = prof.stats.rifts?.[r.id] || 0, boss = r.waves.flat().some((e) => cfg.enemies[e].archetype === 'boss');
     const d = document.createElement('div'); d.className = 'fr quiet';
-    d.innerHTML = `<div class="card2"><div class="grow"><h3>${r.name}</h3><p>${r.desc}</p>
+    const lead = r.waves.flat().reduce((a, e) => (cfg.enemies[e].health > cfg.enemies[a].health ? e : a));
+    d.innerHTML = `<div class="card2"><div class="riftArt${boss ? ' boss' : ''}"><img src="${portraits[lead] || ''}" alt=""></div><div class="grow"><h3>${r.name}</h3><p>${r.desc}</p>
       <div class="tags"><span class="tag">${r.waves.length} ${r.waves.length === 1 ? 'wave' : 'waves'}</span>${boss ? '<span class="tag" style="--c:var(--ember2)">Boss</span>' : ''}
       ${r.modifiers.map((m) => `<span class="tag" style="--c:var(--brass)" title="${cfg.riftModifiers[m].desc}">${cfg.riftModifiers[m].name}: ${cfg.riftModifiers[m].desc.toLowerCase()}</span>`).join('')}
       ${done ? `<span class="tag" style="--c:var(--verd)">Cleared ${done}×</span>` : ''}</div>
@@ -1424,7 +1426,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=18')).json();
+    cfg = await (await fetch('data/config.json?v=19')).json();
     await loadAll();
     buildArena(cfg);
     col = Col.loadCollection(cfg, store.get('tc.collection', null));

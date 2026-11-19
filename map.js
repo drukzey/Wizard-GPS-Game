@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=18';
-import * as Col from './collection.js?v=18';
+import * as World from './world.js?v=19';
+import * as Col from './collection.js?v=19';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -57,7 +57,8 @@ function createMap() {
   const start = H.cfg.world.demoStart;
   st.map = new maplibregl.Map({ container: 'worldMap', style: STYLE, center: [start.lon, start.lat], zoom: ZOOM, pitch: PITCH, bearing: -20,
     attributionControl: false, maxPitch: 70, minZoom: 16, dragRotate: true, touchPitch: true });
-  st.map.addControl(new maplibregl.AttributionControl({ compact: true }), 'top-left'); // map data credit stays visible, clear of the game buttons
+  st.map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-right');
+  st.map.once('idle', () => document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show')); // map data credit stays visible, clear of the game buttons
   st.map.on('load', () => { fantasyStyle(st.map); addOverlays(); st.map.addLayer(layer3d); st.ready = true; scan(true); });
   st.map.on('click', (e) => { if (st.demo) st.demoTarget = { lat: e.lngLat.lat, lon: e.lngLat.lng }; });
   st.map.on('dragstart', () => { st.follow = false; });

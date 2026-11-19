@@ -91,7 +91,10 @@ export function renderHub(renderer, dt, t, layout) {
   // pull back so the whole platform fits in the part of the screen the sheet leaves free
   const free = portrait ? 1 - (layout.sheet || 0) * 0.8 : 1 - (layout.panel || 0) / w;
   const k = Math.min(2.8, 1.15 / Math.max(0.35, free));
-  c.position.set(0, (portrait ? 2.6 : 2.2) * (0.6 + 0.4 * k), (portrait ? 10.5 : 8.2) * k); c.lookAt(0, 1.15, -0.6);
+  if (hub.focus === 'wizard') { // the profile view: your wizard alone, close enough to see the staff and gear
+    const wz = hub.wizard ? hub.wizard.position : new THREE.Vector3();
+    c.position.set(wz.x, 1.5, wz.z + (portrait ? 5.6 : 4.4) * Math.min(1.8, k)); c.lookAt(wz.x, 1.05, wz.z);
+  } else { c.position.set(0, (portrait ? 2.6 : 2.2) * (0.6 + 0.4 * k), (portrait ? 10.5 : 8.2) * k); c.lookAt(0, 1.15, -0.6); }
   c.clearViewOffset();
   if (layout.sheet) {
     if (portrait) c.setViewOffset(w, h, 0, h * layout.sheet * 0.5, w, h); // shift the scene up by half the sheet height
@@ -106,6 +109,7 @@ export function renderHub(renderer, dt, t, layout) {
   for (const g of hub.team) { g.userData.anim?.update(dt); creatureIdle(g, g.userData.model, t + g.userData.phase); }
   renderer.render(hub.scene, c);
 }
+export function setHubFocus(f) { hub.focus = f; for (const g of hub.team) g.visible = f !== 'wizard'; }
 export function spinHub(dx) { hub.yawV = dx * 3; hub.yaw += dx; }
 
 // ---------- Sanctuary plot ----------
