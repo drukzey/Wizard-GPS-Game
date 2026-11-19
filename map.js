@@ -1,13 +1,13 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=22';
-import * as Col from './collection.js?v=22';
+import * as World from './world.js?v=23';
+import * as Col from './collection.js?v=23';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
 const STYLE = 'https://tiles.openfreemap.org/styles/liberty';
-const ZOOM = 18.2, PITCH = 60;
+const ZOOM = 17.8, PITCH = 60;
 
 const $ = (id) => document.getElementById(id);
 let H; // hooks from game.js
@@ -335,6 +335,7 @@ function setPosition(lat, lon, acc, tooFast) {
 // ---------- spawns and portals ----------
 function scan(force) {
   if (!st.ready || !st.pos) return;
+  if (!g3.origin) setOrigin(st.pos); // the first scan can run before the first frame sets the origin
   const now = Date.now();
   if (!force && now - st.lastScan < 1500) { refreshRanges(); return; }
   st.lastScan = now;
