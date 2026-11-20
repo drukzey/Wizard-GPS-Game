@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=43';
-import * as Col from './collection.js?v=43';
+import * as World from './world.js?v=44';
+import * as Col from './collection.js?v=44';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -122,12 +122,20 @@ const layer3d = {
     g3.scene = new THREE.Scene(); g3.cam = new THREE.Camera();
     g3.scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x3a2e20, 1.7));
     const sun = new THREE.DirectionalLight(0xffe2b8, 2.0); sun.position.set(30, 80, 20); g3.scene.add(sun);
-    g3.renderer = new THREE.WebGLRenderer({ canvas: map.getCanvas(), context: gl, antialias: true });
-    g3.renderer.autoClear = false; g3.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    // Figures draw on their own transparent canvas over the map, so animating them never forces the vector map to redraw.
+    const cv = document.createElement('canvas'); cv.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none';
+    map.getCanvasContainer().insertBefore(cv, map.getCanvas().nextSibling);
+    g3.renderer = new THREE.WebGLRenderer({ canvas: cv, alpha: true, antialias: false, powerPreference: 'low-power' });
+    g3.renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); g3.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    const fit = () => { const c = map.getContainer(); g3.renderer.setSize(c.clientWidth, c.clientHeight, false); draw3d(); };
+    fit(); map.on('resize', fit);
     buildWizard();
   },
-  render(gl, matrix) {
-    if (!st.pos) return;
+  render(gl, matrix) { g3.matrix = Array.from(matrix); draw3d(); }, // the map only hands over its camera here
+};
+function draw3d() {
+    const matrix = g3.matrix;
+    if (!st.pos || !matrix || !g3.renderer) return;
     const dt = Math.min(0.1, g3.clock.getDelta()), t = g3.clock.elapsedTime;
     if (!g3.origin || World.distanceM(g3.origin, st.pos) > 1500) setOrigin(st.pos);
     const m = new THREE.Matrix4().fromArray(matrix);
@@ -161,9 +169,8 @@ const layer3d = {
       p.needsUpdate = true; g3.motes.material.opacity = 0.55 + 0.25 * Math.sin(t * 1.3);
     }
 
-    g3.renderer.resetState(); g3.renderer.render(g3.scene, g3.cam);
-  },
-};
+    g3.renderer.render(g3.scene, g3.cam);
+}
 function buildMotes() { // fireflies and drifting sparks around the wizard
   const n = 140, pos = new Float32Array(n * 3);
   for (let i = 0; i < n; i++) { const a = Math.random() * Math.PI * 2, r = 6 + Math.random() * 70; pos.set([Math.cos(a) * r, Math.random() * 14, Math.sin(a) * r], i * 3); }
@@ -525,7 +532,8 @@ function walkView(dt) {
     st.heading = Math.atan2(dLon * Math.cos((st.view.lat * Math.PI) / 180), -dLat); // facing +z (south) is 0
     st.view = { lat: st.view.lat + dLat * k, lon: st.view.lon + dLon * k }; st.speed = speed;
     st.moving = 0.25;
-    st.map.jumpTo({ center: [st.view.lon, st.view.lat] });
+    st.panT = (st.panT || 0) + dt; // follow at 15 fps: each jumpTo redraws the whole map
+    if (st.panT >= 1 / 15) { st.panT = 0; st.map.jumpTo({ center: [st.view.lon, st.view.lat] }); }
   }
   st.moving = Math.max(0, st.moving - dt);
 }
@@ -534,8 +542,8 @@ function walkView(dt) {
 export function tickWorld(dt) {
   if (!st.open || !st.pos) return;
   walkView(dt);
-  st.frameT = (st.frameT || 0) + dt; // the 3D figures animate at 30 fps; nothing redraws while a page covers the map
-  if (st.frameT >= 1 / 30 && !(H.covered && H.covered())) { st.frameT = 0; st.map.triggerRepaint(); }
+  st.frameT = (st.frameT || 0) + dt; // the 3D figures animate at 30 fps on their own canvas; nothing draws while a page covers the map
+  if (st.frameT >= 1 / 30 && !(H.covered && H.covered())) { st.frameT = 0; draw3d(); }
   if (st.demo && st.demoTarget) {
     const d = World.distanceM(st.pos, st.demoTarget), step = H.cfg.world.demoWalkMps * dt;
     if (d <= step) { setPosition(st.demoTarget.lat, st.demoTarget.lon, 5, false); st.demoTarget = null; }

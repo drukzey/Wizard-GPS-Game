@@ -313,8 +313,7 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .nearFaces .slot{width:38px;height:38px;border:6px solid transparent;border-image:var(--u-g_slot) 40 / 6px stretch;background:#0b0f0e padding-box;box-sizing:border-box;display:flex;overflow:hidden}
 .nearFaces img{width:100%;height:100%;object-fit:cover}
 .nearFaces img.unknown{filter:brightness(0) drop-shadow(0 0 1px #9aa39e)}
-.nearbyBtn.has{animation:nearPulse 2.4s ease-in-out infinite}
-@keyframes nearPulse{50%{filter:drop-shadow(0 0 12px #e8b85acc)}}
+.nearbyBtn.has{filter:drop-shadow(0 0 8px #e8b85a99)}
 @media (prefers-reduced-motion:reduce){.nearbyBtn.has{animation:none}}
 .goalCard{margin-right:auto;flex:1;max-width:380px;min-width:0;display:flex;align-items:center;gap:8px;text-align:left;cursor:pointer;color:var(--bone);font:inherit;
   border:8px solid transparent;border-image:var(--u-g_card) 44 / 18px stretch;background:linear-gradient(#1b2122f0,#0e1213f0) padding-box;padding:6px 8px;box-sizing:border-box;filter:drop-shadow(0 3px 8px #000a)}
@@ -325,7 +324,7 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .gBar{height:14px;border:6px solid transparent;border-image:var(--u-g_bar) 34 32 / 6px stretch;background:#07090a padding-box;display:block;box-sizing:border-box}
 .gBar i{display:block;height:100%;background:linear-gradient(90deg,#b8862e,#f2cf86);transition:width .4s}
 .gGo{flex:none;font:700 16px var(--display);padding:6px 12px;border:10px solid transparent;border-image:var(--u-f_btn) 40 / 10px stretch;background:#5a1c15 padding-box;color:var(--bone)}
-.goalCard.done{animation:nearPulse 2s ease-in-out infinite}.goalCard.done .gGo{background:#7a5a1a padding-box}
+.goalCard.done{filter:drop-shadow(0 0 8px #e8b85a99)}.goalCard.done .gGo{background:#7a5a1a padding-box}
 .goalRow{display:flex;gap:10px;align-items:center;padding:8px 12px;margin-bottom:6px;border:8px solid transparent;border-image:var(--u-g_row) 40 / 16px stretch;background:#0f1314 padding-box}
 .goalRow .grow{flex:1;min-width:0}.goalRow b{font:700 17px var(--display)}.goalRow .cost{flex-wrap:wrap;justify-content:flex-end}
 .goalRow.claimed{opacity:.55}.goalRow.claimed .gIcon{background:var(--ash)}
@@ -421,9 +420,9 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 .pageHead h1::before{content:'';position:absolute;z-index:-1;left:0;right:0;top:-40px;height:calc(100% + 64px);background:#5a1c15;-webkit-mask:var(--u-g_flag) top/100% 100% no-repeat;mask:var(--u-g_flag) top/100% 100% no-repeat;filter:drop-shadow(0 4px 8px #000)}
 /* loading: static paths, since the sprite variables are not ready yet */
 #loading{background:radial-gradient(ellipse at 50% 40%,#2a2342,#0b0a14 72%)}
-#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=43') center/contain no-repeat;opacity:.9}
+#loading::before{content:'';width:min(320px,70vw);height:60px;background:url('ui/f_crest.png?v=44') center/contain no-repeat;opacity:.9}
 #loading h1{font-size:56px;text-shadow:0 3px 12px #000,0 0 30px #7b5cd666}
-#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=43') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
+#loading .lb{width:min(320px,74vw);height:30px;border:9px solid transparent;border-image:url('ui/g_bar.png?v=44') 34 32 / 9px stretch;background:#07090a padding-box;box-sizing:border-box}
 #loading .lb i{background:linear-gradient(90deg,#b8862e,#f2cf86)}
 #loadT{font:600 15px var(--body);color:#c9bfa8}
 
@@ -699,6 +698,6 @@ details.help td:first-child{color:var(--bone);white-space:nowrap}
 </div>
 <div class="toast" id="toast" hidden></div>
 <div id="loading"><h1>Tomecraft</h1><div class="lb"><i id="loadI"></i></div><div id="loadT">Opening the tome…</div></div>
-<script type="module" src="game.js?v=43"></script>
+<script type="module" src="game.js?v=44"></script>
 </body>
 </html>

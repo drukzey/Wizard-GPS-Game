@@ -1,17 +1,17 @@
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { createSim } from './sim.js?v=43';
-import { Animator, makeLibrary, addClips, gunzipB64 } from './anim.js?v=43';
-import * as Col from './collection.js?v=43';
-import * as P from './progression.js?v=43';
-import * as S from './sanctuary.js?v=43';
-import * as Stage from './stage.js?v=43';
-import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=43';
-import * as World from './world.js?v=43';
+import { createSim } from './sim.js?v=44';
+import { Animator, makeLibrary, addClips, gunzipB64 } from './anim.js?v=44';
+import * as Col from './collection.js?v=44';
+import * as P from './progression.js?v=44';
+import * as S from './sanctuary.js?v=44';
+import * as Stage from './stage.js?v=44';
+import { initWorld, openWorld, returnToWorld, tickWorld, worldOpen, hideWorld, nearbyState, flyTo, refreshWizardGear } from './map.js?v=44';
+import * as World from './world.js?v=44';
 
 const $ = (id) => document.getElementById(id);
-const VER = 43; // cache-busting version, kept in step by stamp.py
+const VER = 44; // cache-busting version, kept in step by stamp.py
 const store = { get(k, d) { try { const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} } };
 
@@ -122,7 +122,7 @@ async function loadAll() {
   const tick = (name) => { done++; $('loadI').style.width = `${(100 * done) / steps}%`; $('loadT').textContent = name; };
   // HUD sprites -> CSS variables (and a few as textures for ground effects)
   await Promise.all(UI_SPRITES.map(async (k) => {
-    const { img, src } = await loadImage(`ui/${k}.png?v=43`);
+    const { img, src } = await loadImage(`ui/${k}.png?v=44`);
     document.documentElement.style.setProperty(`--u-${k}`, `url("${src}")`); uiSrc[k] = src;
     if (['sigilL', 'sigilM', 'reticle'].includes(k)) { const t = new THREE.Texture(img); t.colorSpace = THREE.SRGBColorSpace; t.needsUpdate = true; assets.tex[k] = t; }
   }));
@@ -189,7 +189,7 @@ async function loadModel(name, sanct) {
   if (name.endsWith('_glass') && !GLASS.has(name.slice(0, -6))) return null;
   modelCache[name] ||= (async () => {
     try {
-      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=43')).default)[name];
+      const b64 = sanct ? (await import(`./pub/sanct/${name}.js?v=${VER}`)).default[name] : (assets.gear ||= (await import('./pub/gear.js?v=44')).default)[name];
       if (!b64) return null;
       const obj = fbx.parse(await gunzipB64(b64), '');
       const df = name.startsWith('df_'); // Dark Fantasy pieces use their own atlas, and their fire and runes glow
@@ -1537,7 +1537,7 @@ window.__tomecraft = { get sim() { return sim; }, get assets() { return assets; 
 // ---------- boot ----------
 (async () => {
   try {
-    cfg = await (await fetch('data/config.json?v=43')).json();
+    cfg = await (await fetch('data/config.json?v=44')).json();
     await loadAll();
     col = Col.loadCollection(cfg, store.get('tc.collection', null));
     if (!Object.keys(col.owned).length) Col.grantStarters(cfg, col, Date.now());
