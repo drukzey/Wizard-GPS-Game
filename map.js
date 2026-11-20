@@ -1,8 +1,8 @@
 // Tomecraft world map: the home screen. MapLibre + OpenFreeMap tiles, phone GPS, and a three.js layer that stands
 // the wizard, wild familiars and rift portals on the map in 3D. Location never leaves the device.
 import * as THREE from 'three';
-import * as World from './world.js?v=44';
-import * as Col from './collection.js?v=44';
+import * as World from './world.js?v=45';
+import * as Col from './collection.js?v=45';
 
 const MAPLIBRE_JS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js';
 const MAPLIBRE_CSS = 'https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css';
@@ -422,19 +422,19 @@ function scan(force) {
 }
 // Don't place familiars on water or roads (GDD §11). Only checkable for points the map has drawn.
 // Building footprints from the map tiles, refreshed each scan, so nothing stands inside a house.
-function buildingsNear() {
-  try { return st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'building' }).map((f) => f.geometry).filter((g) => g && /Polygon/.test(g.type)); } catch { return []; }
+function buildingsNear() { // one outline per building with its box worked out once, so each point test is cheap
+  let gs; try { gs = st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'building' }).map((f) => f.geometry).filter((g) => g && /Polygon/.test(g.type)); } catch { return []; }
+  const out = [];
+  for (const g of gs) for (const poly of g.type === 'Polygon' ? [g.coordinates] : g.coordinates) {
+    const r = poly[0]; if (!r || r.length < 3) continue;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity; for (const [x, y] of r) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
+    out.push({ r, minX, maxX, minY, maxY });
+  }
+  return out;
 }
 function inRing(x, y, ring) { let c = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const [xi, yi] = ring[i], [xj, yj] = ring[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; }
 function insideBuilding(p) {
-  for (const g of st.buildings || []) {
-    for (const poly of g.type === 'Polygon' ? [g.coordinates] : g.coordinates) {
-      const r = poly[0]; if (!r || r.length < 3) continue;
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity; for (const [x, y] of r) { if (x < minX) minX = x; if (x > maxX) maxX = x; if (y < minY) minY = y; if (y > maxY) maxY = y; }
-      if (p.lon < minX || p.lon > maxX || p.lat < minY || p.lat > maxY) continue;
-      if (inRing(p.lon, p.lat, r)) return true;
-    }
-  }
+  for (const b of st.buildings || []) if (p.lon >= b.minX && p.lon <= b.maxX && p.lat >= b.minY && p.lat <= b.maxY && inRing(p.lon, p.lat, b.r)) return true;
   return false;
 }
 function safeSkip(s) {
@@ -498,8 +498,15 @@ function tapShrine(s) {
 /** Points of interest the map has loaded (shops, cafes, monuments...), for shrines to stand on. */
 function pois() {
   try {
-    return st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'poi' }).filter((f) => f.geometry.type === 'Point')
-      .map((f) => ({ id: f.id ?? f.properties.name, name: f.properties.name || null, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] }));
+    // Tiles repeat the same points many times over (13k+ in a city); keep each once and only those near enough to matter.
+    const seen = new Set(), out = [], R = H.cfg.world.viewRadiusM + H.cfg.shrines.cellM;
+    for (const f of st.map.querySourceFeatures('openmaptiles', { sourceLayer: 'poi' })) {
+      if (f.geometry.type !== 'Point') continue;
+      const p = { id: f.id ?? f.properties.name, name: f.properties.name || null, lon: f.geometry.coordinates[0], lat: f.geometry.coordinates[1] };
+      const k = `${p.id}|${p.lon.toFixed(5)}`; if (seen.has(k)) continue; seen.add(k);
+      if (World.distanceM(st.pos, p) <= R) out.push(p);
+    }
+    return out;
   } catch { return []; }
 }
 /** Turn the camera to face something nearby; the wizard stays in the centre. */
